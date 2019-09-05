@@ -3,7 +3,7 @@ Accessing root, body, html, and head nodes..
 --SKIPIF--
 <?php if (!extension_loaded("tidy")) print "skip"; ?>
 --FILE--
-<?php 
+<?php
 $a = tidy_parse_string("<HTML><BODY BGCOLOR=#FFFFFF ALINK=#000000></BODY></HTML>", array('newline' => 'LF'));
 var_dump($a->root());
 var_dump($a->body());
@@ -11,7 +11,7 @@ var_dump($a->html());
 var_dump($a->head());
 
 ?>
---EXPECT--
+--EXPECTF--
 object(tidyNode)#2 (8) {
   ["value"]=>
   string(94) "<html>
@@ -100,7 +100,7 @@ object(tidyNode)#2 (8) {
               ["proprietary"]=>
               bool(false)
               ["id"]=>
-              int(111)
+              int(%i)
               ["attribute"]=>
               NULL
               ["child"]=>
@@ -231,7 +231,7 @@ object(tidyNode)#2 (9) {
           ["proprietary"]=>
           bool(false)
           ["id"]=>
-          int(111)
+          int(%i)
           ["attribute"]=>
           NULL
           ["child"]=>
@@ -307,7 +307,7 @@ object(tidyNode)#2 (9) {
       ["proprietary"]=>
       bool(false)
       ["id"]=>
-      int(111)
+      int(%i)
       ["attribute"]=>
       NULL
       ["child"]=>

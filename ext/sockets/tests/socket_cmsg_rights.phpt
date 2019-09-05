@@ -8,11 +8,13 @@ die('skip sockets extension not available.');
 if (strtolower(substr(PHP_OS, 0, 3)) == 'win') {
 die('skip not for Microsoft Windows');
 }
+if (strtolower(substr(PHP_OS, 0, 3)) == 'aix') {
+die('skip not for AIX');
+}
 --CLEAN--
 <?php
 $path = __DIR__ . "/unix_sock";
 @unlink($path);
-
 --FILE--
 <?php
 include __DIR__."/mcast_helpers.php.inc";
@@ -49,11 +51,32 @@ checktimeout($s, 500);
 $data = [
     "name" => [],
     "buffer_size" => 2000,
-    "controllen" => socket_cmsg_space(SOL_SOCKET, SCM_RIGHTS, 3)
+    "controllen" => socket_cmsg_space(SOL_SOCKET, SCM_RIGHTS, 4)
 ];
 var_dump($data);
 if (!socket_recvmsg($s, $data, 0)) die("recvmsg");
-print_r($data);
+
+if ($data["control"]) {
+    $control = $data["control"][0];
+    if ($control["level"] == SOL_SOCKET &&
+        $control["type"]  == SCM_RIGHTS) {
+        foreach ($control["data"] as $resource) {
+            if (!is_resource($resource)) {
+                echo "FAIL RES\n";
+                var_dump($data);
+                exit;
+            }
+        }
+        echo "OK";
+    } else {
+        echo "FAIL RIGHTS\n";
+        var_dump($data);
+        exit;
+    }
+} else {
+    echo "FAIL CONTROL\n";
+    var_dump($data);
+}
 --EXPECTF--
 creating send socket
 resource(%d) of type (Socket)
@@ -68,34 +91,6 @@ array(3) {
   ["buffer_size"]=>
   int(2000)
   ["controllen"]=>
-  int(32)
+  int(%d)
 }
-Array
-(
-    [name] => 
-    [control] => Array
-        (
-            [0] => Array
-                (
-                    [level] => %d
-                    [type] => %d
-                    [data] => Array
-                        (
-                            [0] => Resource id #%d
-                            [1] => Resource id #%d
-                            [2] => Resource id #%d
-                            [3] => Resource id #%d
-                        )
-
-                )
-
-        )
-
-    [iov] => Array
-        (
-            [0] => test thing
-
-        )
-
-    [flags] => 0
-)
+OK

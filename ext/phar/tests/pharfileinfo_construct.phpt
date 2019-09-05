@@ -6,7 +6,7 @@ Phar: PharFileInfo::__construct
 phar.readonly=0
 --FILE--
 <?php
-$fname = dirname(__FILE__) . '/' . basename(__FILE__, '.php') . '.phar';
+$fname = __DIR__ . '/' . basename(__FILE__, '.php') . '.phar';
 $pname = 'phar://' . $fname;
 
 try {
@@ -17,7 +17,11 @@ echo $e->getMessage() . "\n";
 unlink($fname);
 }
 
+try {
 $a = new PharFileInfo(array());
+} catch (TypeError $e) {
+echo $e->getMessage() . "\n";
+}
 
 $a = new Phar($fname);
 $a['a'] = 'hi';
@@ -43,12 +47,11 @@ echo $e->getMessage() . "\n";
 ?>
 ===DONE===
 --CLEAN--
-<?php unlink(dirname(__FILE__) . '/' . basename(__FILE__, '.clean.php') . '.phar'); ?>
+<?php unlink(__DIR__ . '/' . basename(__FILE__, '.clean.php') . '.phar'); ?>
 --EXPECTF--
 Cannot open phar file 'phar://%spharfileinfo_construct.phar/oops': internal corruption of phar "%spharfileinfo_construct.phar" (truncated entry)
-
-Warning: PharFileInfo::__construct() expects parameter 1 to be %string, array given in %spharfileinfo_construct.php on line %d
-Cannot access phar file entry '/oops/I/do/not/exist' in archive '%spharfileinfo_construct.phar'
+PharFileInfo::__construct() expects parameter 1 to be a valid path, array given
+Cannot access phar file entry '%s' in archive '%s'
 Cannot call constructor twice
-'%spharfileinfo_construct.php' is not a valid phar archive URL (must have at least phar://filename.phar)
+'%s' is not a valid phar archive URL (must have at least phar://filename.phar)
 ===DONE===

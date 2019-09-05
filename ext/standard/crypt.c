@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | PHP Version 7                                                        |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1997-2015 The PHP Group                                |
+   | Copyright (c) The PHP Group                                          |
    +----------------------------------------------------------------------+
    | This source file is subject to version 3.01 of the PHP license,      |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -13,18 +13,15 @@
    | license@php.net so we can mail you a copy immediately.               |
    +----------------------------------------------------------------------+
    | Authors: Stig Bakken <ssb@php.net>                                   |
-   |          Zeev Suraski <zeev@zend.com>                                |
+   |          Zeev Suraski <zeev@php.net>                                 |
    |          Rasmus Lerdorf <rasmus@php.net>                             |
    |          Pierre Joye <pierre@php.net>                                |
    +----------------------------------------------------------------------+
 */
 
-/* $Id$ */
-
 #include <stdlib.h>
 
 #include "php.h"
-#if HAVE_CRYPT
 
 #if HAVE_UNISTD_H
 #include <unistd.h>
@@ -40,65 +37,18 @@
 #  include <crypt.h>
 # endif
 #endif
-#if TM_IN_SYS_TIME
-#include <sys/time.h>
-#else
 #include <time.h>
-#endif
-#if HAVE_STRING_H
 #include <string.h>
-#else
-#include <strings.h>
-#endif
 
 #ifdef PHP_WIN32
 #include <process.h>
 #endif
 
-#include "php_lcg.h"
 #include "php_crypt.h"
-#include "php_rand.h"
+#include "php_random.h"
 
-/* The capabilities of the crypt() function is determined by the test programs
- * run by configure from aclocal.m4.  They will set PHP_STD_DES_CRYPT,
- * PHP_EXT_DES_CRYPT, PHP_MD5_CRYPT and PHP_BLOWFISH_CRYPT as appropriate
- * for the target platform. */
-
-#if PHP_STD_DES_CRYPT
-#define PHP_MAX_SALT_LEN 2
-#endif
-
-#if PHP_EXT_DES_CRYPT
-#undef PHP_MAX_SALT_LEN
-#define PHP_MAX_SALT_LEN 9
-#endif
-
-#if PHP_MD5_CRYPT
-#undef PHP_MAX_SALT_LEN
-#define PHP_MAX_SALT_LEN 12
-#endif
-
-#if PHP_BLOWFISH_CRYPT
-#undef PHP_MAX_SALT_LEN
-#define PHP_MAX_SALT_LEN 60
-#endif
-
-#if PHP_SHA512_CRYPT
-#undef PHP_MAX_SALT_LEN
+/* sha512 crypt has the maximal salt length of 123 characters */
 #define PHP_MAX_SALT_LEN 123
-#endif
-
-
-/* If the configure-time checks fail, we provide DES.
- * XXX: This is a hack. Fix the real problem! */
-
-#ifndef PHP_MAX_SALT_LEN
-#define PHP_MAX_SALT_LEN 2
-#undef PHP_STD_DES_CRYPT
-#define PHP_STD_DES_CRYPT 1
-#endif
-
-#define PHP_CRYPT_RAND php_rand()
 
 /* Used to check DES salts to ensure that they contain only valid characters */
 #define IS_VALID_SALT_CHARACTER(c) (((c) >= '.' && (c) <= '9') || ((c) >= 'A' && (c) <= 'Z') || ((c) >= 'a' && (c) <= 'z'))
@@ -109,18 +59,12 @@
 PHP_MINIT_FUNCTION(crypt) /* {{{ */
 {
 	REGISTER_LONG_CONSTANT("CRYPT_SALT_LENGTH", PHP_MAX_SALT_LEN, CONST_CS | CONST_PERSISTENT);
-	REGISTER_LONG_CONSTANT("CRYPT_STD_DES", PHP_STD_DES_CRYPT, CONST_CS | CONST_PERSISTENT);
-	REGISTER_LONG_CONSTANT("CRYPT_EXT_DES", PHP_EXT_DES_CRYPT, CONST_CS | CONST_PERSISTENT);
-	REGISTER_LONG_CONSTANT("CRYPT_MD5", PHP_MD5_CRYPT, CONST_CS | CONST_PERSISTENT);
-	REGISTER_LONG_CONSTANT("CRYPT_BLOWFISH", PHP_BLOWFISH_CRYPT, CONST_CS | CONST_PERSISTENT);
-
-#ifdef PHP_SHA256_CRYPT
-   REGISTER_LONG_CONSTANT("CRYPT_SHA256", PHP_SHA256_CRYPT, CONST_CS | CONST_PERSISTENT);
-#endif
-
-#ifdef PHP_SHA512_CRYPT
-   REGISTER_LONG_CONSTANT("CRYPT_SHA512", PHP_SHA512_CRYPT, CONST_CS | CONST_PERSISTENT);
-#endif
+	REGISTER_LONG_CONSTANT("CRYPT_STD_DES", 1, CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("CRYPT_EXT_DES", 1, CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("CRYPT_MD5", 1, CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("CRYPT_BLOWFISH", 1, CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("CRYPT_SHA256", 1, CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("CRYPT_SHA512", 1, CONST_CS | CONST_PERSISTENT);
 
 #if PHP_USE_PHP_CRYPT_R
 	php_init_crypt_r();
@@ -142,16 +86,16 @@ PHP_MSHUTDOWN_FUNCTION(crypt) /* {{{ */
 
 static unsigned char itoa64[] = "./0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
-static void php_to64(char *s, zend_long v, int n) /* {{{ */
+static void php_to64(char *s, int n) /* {{{ */
 {
 	while (--n >= 0) {
-		*s++ = itoa64[v&0x3f];
-		v >>= 6;
+		*s = itoa64[*s & 0x3f];
+		s++;
 	}
 }
 /* }}} */
 
-PHPAPI zend_string *php_crypt(const char *password, const int pass_len, const char *salt, int salt_len)
+PHPAPI zend_string *php_crypt(const char *password, const int pass_len, const char *salt, int salt_len, zend_bool quiet)
 {
 	char *crypt_res;
 	zend_string *result;
@@ -175,12 +119,12 @@ PHPAPI zend_string *php_crypt(const char *password, const int pass_len, const ch
 
 			crypt_res = php_sha512_crypt_r(password, salt, output, PHP_MAX_SALT_LEN);
 			if (!crypt_res) {
-				memset(output, 0, PHP_MAX_SALT_LEN);
+				ZEND_SECURE_ZERO(output, PHP_MAX_SALT_LEN);
 				efree(output);
 				return NULL;
 			} else {
 				result = zend_string_init(output, strlen(output), 0);
-				memset(output, 0, PHP_MAX_SALT_LEN);
+				ZEND_SECURE_ZERO(output, PHP_MAX_SALT_LEN);
 				efree(output);
 				return result;
 			}
@@ -190,12 +134,12 @@ PHPAPI zend_string *php_crypt(const char *password, const int pass_len, const ch
 
 			crypt_res = php_sha256_crypt_r(password, salt, output, PHP_MAX_SALT_LEN);
 			if (!crypt_res) {
-				memset(output, 0, PHP_MAX_SALT_LEN);
+				ZEND_SECURE_ZERO(output, PHP_MAX_SALT_LEN);
 				efree(output);
 				return NULL;
 			} else {
 				result = zend_string_init(output, strlen(output), 0);
-				memset(output, 0, PHP_MAX_SALT_LEN);
+				ZEND_SECURE_ZERO(output, PHP_MAX_SALT_LEN);
 				efree(output);
 				return result;
 			}
@@ -225,14 +169,17 @@ PHPAPI zend_string *php_crypt(const char *password, const int pass_len, const ch
 			if (salt[0] != '_') {
 				/* DES style hashes */
 				if (!IS_VALID_SALT_CHARACTER(salt[0]) || !IS_VALID_SALT_CHARACTER(salt[1])) {
-					php_error_docref(NULL, E_DEPRECATED, DES_INVALID_SALT_ERROR);
+					if (!quiet) {
+						/* error consistently about invalid DES fallbacks */
+						php_error_docref(NULL, E_DEPRECATED, DES_INVALID_SALT_ERROR);
+					}
 				}
 			}
 
 			memset(&buffer, 0, sizeof(buffer));
 			_crypt_extended_init_r();
 
-			crypt_res = _crypt_extended_r(password, salt, &buffer);
+			crypt_res = _crypt_extended_r((const unsigned char *) password, salt, &buffer);
 			if (!crypt_res || (salt[0] == '*' && salt[1] == '0')) {
 				return NULL;
 			} else {
@@ -243,6 +190,13 @@ PHPAPI zend_string *php_crypt(const char *password, const int pass_len, const ch
 	}
 #else
 
+	if (salt[0] != '$' && salt[0] != '_' && (!IS_VALID_SALT_CHARACTER(salt[0]) || !IS_VALID_SALT_CHARACTER(salt[1]))) {
+		if (!quiet) {
+			/* error consistently about invalid DES fallbacks */
+			php_error_docref(NULL, E_DEPRECATED, DES_INVALID_SALT_ERROR);
+		}
+	}
+
 # if defined(HAVE_CRYPT_R) && (defined(_REENTRANT) || defined(_THREAD_SAFE))
 	{
 #  if defined(CRYPT_R_STRUCT_CRYPT_DATA)
@@ -251,22 +205,23 @@ PHPAPI zend_string *php_crypt(const char *password, const int pass_len, const ch
 #  elif defined(CRYPT_R_CRYPTD)
 		CRYPTD buffer;
 #  else
-#    error Data struct used by crypt_r() is unknown. Please report.
+#   error Data struct used by crypt_r() is unknown. Please report.
 #  endif
-		if (salt[0] != '$' && salt[0] != '_' && (!IS_VALID_SALT_CHARACTER(salt[0]) || !IS_VALID_SALT_CHARACTER(salt[1]))) {
-			/* error consistently about invalid DES fallbacks */
-			php_error_docref(NULL, E_DEPRECATED, DES_INVALID_SALT_ERROR);
-		}
 		crypt_res = crypt_r(password, salt, &buffer);
-		if (!crypt_res || (salt[0] == '*' && salt[1] == '0')) {
-			return NULL;
-		} else {
-			result = zend_string_init(crypt_res, strlen(crypt_res), 0);
-			return result;
-		}
 	}
+# elif defined(HAVE_CRYPT)
+	crypt_res = crypt(password, salt);
+# else
+#  error No crypt() implementation
 # endif
 #endif
+
+	if (!crypt_res || (salt[0] == '*' && salt[1] == '0')) {
+		return NULL;
+	} else {
+		result = zend_string_init(crypt_res, strlen(crypt_res), 0);
+		return result;
+	}
 }
 /* }}} */
 
@@ -280,15 +235,17 @@ PHP_FUNCTION(crypt)
 	size_t str_len, salt_in_len = 0;
 	zend_string *result;
 
+	ZEND_PARSE_PARAMETERS_START(1, 2)
+		Z_PARAM_STRING(str, str_len)
+		Z_PARAM_OPTIONAL
+		Z_PARAM_STRING(salt_in, salt_in_len)
+	ZEND_PARSE_PARAMETERS_END();
+
 	salt[0] = salt[PHP_MAX_SALT_LEN] = '\0';
 
 	/* This will produce suitable results if people depend on DES-encryption
 	 * available (passing always 2-character salt). At least for glibc6.1 */
 	memset(&salt[1], '$', PHP_MAX_SALT_LEN - 1);
-
-	if (zend_parse_parameters(ZEND_NUM_ARGS(), "s|s", &str, &str_len, &salt_in, &salt_in_len) == FAILURE) {
-		return;
-	}
 
 	if (salt_in) {
 		memcpy(salt, salt_in, MIN(PHP_MAX_SALT_LEN, salt_in_len));
@@ -298,22 +255,17 @@ PHP_FUNCTION(crypt)
 
 	/* The automatic salt generation covers standard DES, md5-crypt and Blowfish (simple) */
 	if (!*salt) {
-#if PHP_MD5_CRYPT
-		strncpy(salt, "$1$", PHP_MAX_SALT_LEN);
-		php_to64(&salt[3], PHP_CRYPT_RAND, 4);
-		php_to64(&salt[7], PHP_CRYPT_RAND, 4);
+		memcpy(salt, "$1$", 3);
+		php_random_bytes_throw(&salt[3], 8);
+		php_to64(&salt[3], 8);
 		strncpy(&salt[11], "$", PHP_MAX_SALT_LEN - 11);
-#elif PHP_STD_DES_CRYPT
-		php_to64(&salt[0], PHP_CRYPT_RAND, 2);
-		salt[2] = '\0';
-#endif
 		salt_in_len = strlen(salt);
 	} else {
 		salt_in_len = MIN(PHP_MAX_SALT_LEN, salt_in_len);
 	}
 	salt[salt_in_len] = '\0';
 
-	if ((result = php_crypt(str, (int)str_len, salt, (int)salt_in_len)) == NULL) {
+	if ((result = php_crypt(str, (int)str_len, salt, (int)salt_in_len, 0)) == NULL) {
 		if (salt[0] == '*' && salt[1] == '0') {
 			RETURN_STRING("*1");
 		} else {
@@ -323,13 +275,3 @@ PHP_FUNCTION(crypt)
 	RETURN_STR(result);
 }
 /* }}} */
-#endif
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: sw=4 ts=4 fdm=marker
- * vim<600: sw=4 ts=4
- */

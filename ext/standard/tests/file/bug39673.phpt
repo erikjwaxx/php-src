@@ -5,7 +5,7 @@ Bug #39673 (file_get_contents causes bus error on certain offsets)
 
 $str = str_repeat("test", 3456);
 
-$filename = dirname(__FILE__).'/bug39673.txt';
+$filename = __DIR__.'/bug39673.txt';
 file_put_contents($filename, $str);
 
 $offsets = array(
@@ -22,14 +22,14 @@ $offsets = array(
 
 foreach ($offsets as $offset) {
 	$r = file_get_contents($filename, false, null, $offset);
-	var_dump(strlen($r));
+	if ($r !== false) var_dump(strlen($r));
 }
 
 @unlink($filename);
 echo "Done\n";
 ?>
---EXPECTF--	
-int(13824)
+--EXPECT--
+int(1)
 int(13824)
 int(0)
 int(1)

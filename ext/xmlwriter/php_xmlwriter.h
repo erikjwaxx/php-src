@@ -2,7 +2,7 @@
   +----------------------------------------------------------------------+
   | PHP Version 7                                                        |
   +----------------------------------------------------------------------+
-  | Copyright (c) 1997-2015 The PHP Group                                |
+  | Copyright (c) The PHP Group                                          |
   +----------------------------------------------------------------------+
   | This source file is subject to version 3.01 of the PHP license,      |
   | that is bundled with this package in the file LICENSE, and is        |
@@ -17,13 +17,14 @@
   +----------------------------------------------------------------------+
 */
 
-/* $Id$ */
-
 #ifndef PHP_XMLWRITER_H
 #define PHP_XMLWRITER_H
 
 extern zend_module_entry xmlwriter_module_entry;
 #define phpext_xmlwriter_ptr &xmlwriter_module_entry
+
+#include "php_version.h"
+#define PHP_XMLWRITER_VERSION PHP_VERSION
 
 #ifdef ZTS
 #include "TSRM.h"
@@ -53,12 +54,3 @@ static inline ze_xmlwriter_object *php_xmlwriter_fetch_object(zend_object *obj) 
 #define Z_XMLWRITER_P(zv) php_xmlwriter_fetch_object(Z_OBJ_P((zv)))
 
 #endif	/* PHP_XMLWRITER_H */
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: noet sw=4 ts=4 fdm=marker
- * vim<600: noet sw=4 ts=4
- */

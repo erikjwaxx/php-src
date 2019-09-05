@@ -97,12 +97,18 @@ static void cl_hash (register count_int chsize, GifCtx *ctx);
 static void char_init (GifCtx *ctx);
 static void char_out (int c, GifCtx *ctx);
 static void flush_char (GifCtx *ctx);
+
+static int _gdImageGifCtx(gdImagePtr im, gdIOCtxPtr out);
+
 void * gdImageGifPtr (gdImagePtr im, int *size)
 {
   void *rv;
   gdIOCtx *out = gdNewDynamicCtx (2048, NULL);
-  gdImageGifCtx (im, out);
-  rv = gdDPExtractData (out, size);
+	if (!_gdImageGifCtx(im, out)) {
+		rv = gdDPExtractData(out, size);
+	} else {
+		rv = NULL;
+	}
   out->gd_free (out);
   return rv;
 }
@@ -116,6 +122,12 @@ void gdImageGif (gdImagePtr im, FILE * outFile)
 
 void gdImageGifCtx(gdImagePtr im, gdIOCtxPtr out)
 {
+	_gdImageGifCtx(im, out);
+}
+
+/* returns 0 on success, 1 on failure */
+static int _gdImageGifCtx(gdImagePtr im, gdIOCtxPtr out)
+{
 	gdImagePtr pim = 0, tim = im;
 	int interlace, BitsPerPixel;
 	interlace = im->interlace;
@@ -125,19 +137,21 @@ void gdImageGifCtx(gdImagePtr im, gdIOCtxPtr out)
 			based temporary image. */
 		pim = gdImageCreatePaletteFromTrueColor(im, 1, 256);
 		if (!pim) {
-			return;
+			return 1;
 		}
 		tim = pim;
 	}
 	BitsPerPixel = colorstobpp(tim->colorsTotal);
 	/* All set, let's do it. */
 	GIFEncode(
-		out, tim->sx, tim->sy, tim->interlace, 0, tim->transparent, BitsPerPixel,
+		out, tim->sx, tim->sy, interlace, 0, tim->transparent, BitsPerPixel,
 		tim->red, tim->green, tim->blue, tim);
 	if (pim) {
 		/* Destroy palette based temporary image. */
 		gdImageDestroy(	pim);
 	}
+
+    return 0;
 }
 
 static int
@@ -601,14 +615,26 @@ nomatch:
  * code in turn.  When the buffer fills up empty it and start over.
  */
 
-static unsigned long masks[] = { 0x0000, 0x0001, 0x0003, 0x0007, 0x000F,
+static const unsigned long masks[] = { 0x0000, 0x0001, 0x0003, 0x0007, 0x000F,
                                   0x001F, 0x003F, 0x007F, 0x00FF,
                                   0x01FF, 0x03FF, 0x07FF, 0x0FFF,
                                   0x1FFF, 0x3FFF, 0x7FFF, 0xFFFF };
 
+
+/* Arbitrary value to mark output is done.  When we see EOFCode, then we don't
+ * expect to see any more data.  If we do (e.g. corrupt image inputs), cur_bits
+ * might be negative, so flag it to return early.
+ */
+#define CUR_BITS_FINISHED -1000
+
+
 static void
 output(code_int code, GifCtx *ctx)
 {
+	if (ctx->cur_bits == CUR_BITS_FINISHED) {
+		return;
+	}
+
     ctx->cur_accum &= masks[ ctx->cur_bits ];
 
     if( ctx->cur_bits > 0 )
@@ -655,8 +681,10 @@ output(code_int code, GifCtx *ctx)
                 ctx->cur_bits -= 8;
         }
 
-        flush_char(ctx);
+		/* Flag that it's done to prevent re-entry. */
+		ctx->cur_bits = CUR_BITS_FINISHED;
 
+        flush_char(ctx);
     }
 }
 

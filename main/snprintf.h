@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | PHP Version 7                                                        |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1997-2015 The PHP Group                                |
+   | Copyright (c) The PHP Group                                          |
    +----------------------------------------------------------------------+
    | This source file is subject to version 3.01 of the PHP license,      |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -16,8 +16,6 @@
    |         Marcus Boerger <helly@php.net>                               |
    +----------------------------------------------------------------------+
 */
-
-/* $Id$ */
 
 /*
 
@@ -46,7 +44,7 @@ spprintf is the dynamical version of snprintf. It allocates the buffer in size
          as needed and allows a maximum setting as snprintf (turn this feature
          off by setting max_len to 0). spprintf is a little bit slower than
          snprintf and offers possible memory leakes if you miss freeing the
-         buffer allocated by the function. Therfore this function should be
+         buffer allocated by the function. Therefore this function should be
          used where either no maximum is known or the maximum is much bigger
          than normal size required. spprintf always terminates the buffer.
 
@@ -78,15 +76,15 @@ typedef enum {
 
 
 BEGIN_EXTERN_C()
-PHPAPI int ap_php_slprintf(char *buf, size_t len, const char *format,...);
+PHPAPI int ap_php_slprintf(char *buf, size_t len, const char *format,...) ZEND_ATTRIBUTE_FORMAT(printf, 3, 4);
 PHPAPI int ap_php_vslprintf(char *buf, size_t len, const char *format, va_list ap);
-PHPAPI int ap_php_snprintf(char *, size_t, const char *, ...);
+PHPAPI int ap_php_snprintf(char *, size_t, const char *, ...) ZEND_ATTRIBUTE_FORMAT(printf, 3, 4);
 PHPAPI int ap_php_vsnprintf(char *, size_t, const char *, va_list ap);
 PHPAPI int ap_php_vasprintf(char **buf, const char *format, va_list ap);
-PHPAPI int ap_php_asprintf(char **buf, const char *format, ...);
-PHPAPI int php_sprintf (char* s, const char* format, ...) PHP_ATTRIBUTE_FORMAT(printf, 2, 3);
+PHPAPI int ap_php_asprintf(char **buf, const char *format, ...) ZEND_ATTRIBUTE_FORMAT(printf, 2, 3);
 PHPAPI char * php_gcvt(double value, int ndigit, char dec_point, char exponent, char *buf);
-PHPAPI char * php_conv_fp(register char format, register double num,
+PHPAPI char * php_0cvt(double value, int ndigit, char dec_point, char exponent, char *buf);
+PHPAPI char * php_conv_fp(char format, double num,
 		 boolean_e add_dp, int precision, char dec_point, bool_int * is_negative, char *buf, size_t *len);
 
 END_EXTERN_C()
@@ -119,11 +117,6 @@ END_EXTERN_C()
 #define asprintf ap_php_asprintf
 #endif
 
-#ifdef sprintf
-#undef sprintf
-#endif
-#define sprintf php_sprintf
-
 typedef enum {
 	LM_STD = 0,
 #if SIZEOF_INTMAX_T
@@ -143,8 +136,6 @@ typedef enum {
 
 #ifdef PHP_WIN32
 # define WIDE_INT		__int64
-#elif SIZEOF_LONG_LONG_INT
-# define WIDE_INT		long long int
 #elif SIZEOF_LONG_LONG
 # define WIDE_INT		long long
 #else
@@ -153,11 +144,11 @@ typedef enum {
 typedef WIDE_INT wide_int;
 typedef unsigned WIDE_INT u_wide_int;
 
-PHPAPI char * ap_php_conv_10(register wide_int num, register bool_int is_unsigned,
-	   register bool_int * is_negative, char *buf_end, register size_t *len);
+PHPAPI char * ap_php_conv_10(wide_int num, bool_int is_unsigned,
+	   bool_int * is_negative, char *buf_end, size_t *len);
 
-PHPAPI char * ap_php_conv_p2(register u_wide_int num, register int nbits,
-		 char format, char *buf_end, register size_t *len);
+PHPAPI char * ap_php_conv_p2(u_wide_int num, int nbits,
+		 char format, char *buf_end, size_t *len);
 
 /* The maximum precision that's allowed for float conversion. Does not include
  * decimal separator, exponent, sign, terminator. Currently does not affect
@@ -171,10 +162,3 @@ PHPAPI char * ap_php_conv_p2(register u_wide_int num, register int nbits,
 #define FORMAT_CONV_MAX_PRECISION 500
 
 #endif /* SNPRINTF_H */
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- */

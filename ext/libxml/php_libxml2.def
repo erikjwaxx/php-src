@@ -1544,3 +1544,6 @@ xmlXPtrNewRangePointNode
 xmlXPtrNewRangePoints
 xmlXPtrRangeToFunction
 xmlXPtrWrapLocationSet
+xmlBufContent
+xmlBufUse
+xmlBufferDetach

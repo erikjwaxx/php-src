@@ -42,9 +42,6 @@ PHP_FUNCTION( collator_get_locale )
 	if( zend_parse_method_parameters( ZEND_NUM_ARGS(), getThis(), "Ol",
 		&object, Collator_ce_ptr, &type ) == FAILURE )
 	{
-		intl_error_set( NULL, U_ILLEGAL_ARGUMENT_ERROR,
-			"collator_get_locale: unable to parse input params", 0 );
-
 		RETURN_FALSE;
 	}
 
@@ -55,7 +52,7 @@ PHP_FUNCTION( collator_get_locale )
 		intl_error_set_code( NULL, COLLATOR_ERROR_CODE( co ) );
 		intl_errors_set_custom_msg( COLLATOR_ERROR_P( co ),
 			"Object not initialized", 0 );
-		php_error_docref(NULL, E_RECOVERABLE_ERROR, "Object not initialized");
+		zend_throw_error(NULL, "Object not initialized");
 
 		RETURN_FALSE;
 	}
@@ -69,12 +66,3 @@ PHP_FUNCTION( collator_get_locale )
 	RETVAL_STRINGL( locale_name, strlen(locale_name) );
 }
 /* }}} */
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: noet sw=4 ts=4 fdm=marker
- * vim<600: noet sw=4 ts=4
- */

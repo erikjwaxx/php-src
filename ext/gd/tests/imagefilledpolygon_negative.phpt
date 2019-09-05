@@ -1,15 +1,21 @@
 --TEST--
 imagefilledpolygon() with a negative num of points
 --SKIPIF--
-<?php 
-	if (!function_exists('imagefilledpolygon')) die('skip imagefilledpolygon() not available'); 
+<?php
+	if (!function_exists('imagefilledpolygon')) die('skip imagefilledpolygon() not available');
 ?>
 --FILE--
 <?php
+require __DIR__ . '/func.inc';
+
 $im = imagecreate(100, 100);
 $black = imagecolorallocate($im, 0, 0, 0);
-if (imagefilledpolygon($im, array(0, 0, 0, 0, 0, 0), -1, $black)) echo "should be false";
+
+trycatch_dump(
+    fn() => imagefilledpolygon($im, array(0, 0, 0, 0, 0, 0), -1, $black)
+);
+
 imagedestroy($im);
 ?>
---EXPECTF--
-Warning: imagefilledpolygon(): You must give a positive number of points in %s on line %d
+--EXPECT--
+!! [Error] You must give a positive number of points

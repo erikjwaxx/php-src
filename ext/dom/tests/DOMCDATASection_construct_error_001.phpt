@@ -2,18 +2,14 @@
 __construct() with no arguments.
 --CREDITS--
 Nic Rosental nicrosental@gmail.com
-# TestFest Atlanta 2009-5-14 
+# TestFest Atlanta 2009-5-14
 --SKIPIF--
 <?php require_once('skipif.inc'); ?>
 --FILE--
 <?php
-	try 
-	{
+	try {
 	    $section = new DOMCDataSection();
-		
-	} 
-	catch (Exception $e) 
-	{
+	} catch (TypeError $e) {
 	    echo $e->getMessage();
 	}
 ?>

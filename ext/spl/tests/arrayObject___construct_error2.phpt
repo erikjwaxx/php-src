@@ -13,10 +13,10 @@ Class C implements Iterator {
 
 try {
   var_dump(new ArrayObject(new stdClass, 0, "C", "extra"));
-} catch (InvalidArgumentException $e) {
+} catch (TypeError $e) {
   echo $e->getMessage() . "(" . $e->getLine() .  ")\n";
 }
 ?>
---EXPECTF--
+--EXPECT--
 Too many arguments:
 ArrayObject::__construct() expects at most 3 parameters, 4 given(12)

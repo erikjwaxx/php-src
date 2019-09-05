@@ -1,5 +1,7 @@
 --TEST--
 filter_var_array() on array with reference
+--SKIPIF--
+<?php if (!extension_loaded("filter")) die("skip"); ?>
 --FILE--
 <?php
 
@@ -9,7 +11,7 @@ var_dump(filter_var_array($array2, FILTER_VALIDATE_INT));
 var_dump($array);
 
 ?>
---EXPECTF--
+--EXPECT--
 array(1) {
   [0]=>
   &array(1) {

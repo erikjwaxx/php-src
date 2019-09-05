@@ -2,7 +2,7 @@
   +----------------------------------------------------------------------+
   | PHP Version 7                                                        |
   +----------------------------------------------------------------------+
-  | Copyright (c) 1997-2015 The PHP Group                                |
+  | Copyright (c) The PHP Group                                          |
   +----------------------------------------------------------------------+
   | This source file is subject to version 3.01 of the PHP license,      |
   | that is bundled with this package in the file LICENSE, and is        |
@@ -16,13 +16,11 @@
   +----------------------------------------------------------------------+
 */
 
-/* $Id$ */
 #ifdef HAVE_CONFIG_H
 #   include "config.h"
 #endif
 #include "php.h"
 #if HAVE_ZIP
-#if defined(ZEND_ENGINE_2) || defined(ZEND_ENGINE_3)
 
 #include "php_streams.h"
 #include "ext/standard/file.h"
@@ -31,6 +29,9 @@
 #include "php_zip.h"
 
 #include "ext/standard/url.h"
+
+/* needed for ssize_t definition */
+#include <sys/types.h>
 
 struct php_zip_stream_data_t {
 	struct zip *za;
@@ -44,7 +45,7 @@ struct php_zip_stream_data_t {
 
 
 /* {{{ php_zip_ops_read */
-static size_t php_zip_ops_read(php_stream *stream, char *buf, size_t count)
+static ssize_t php_zip_ops_read(php_stream *stream, char *buf, size_t count)
 {
 	ssize_t n = 0;
 	STREAM_DATA_FROM_STREAM();
@@ -52,11 +53,19 @@ static size_t php_zip_ops_read(php_stream *stream, char *buf, size_t count)
 	if (self->za && self->zf) {
 		n = zip_fread(self->zf, buf, count);
 		if (n < 0) {
+#if LIBZIP_VERSION_MAJOR < 1
 			int ze, se;
 			zip_file_error_get(self->zf, &ze, &se);
 			stream->eof = 1;
 			php_error_docref(NULL, E_WARNING, "Zip stream error: %s", zip_file_strerror(self->zf));
-			return 0;
+#else
+			zip_error_t *err;
+			err = zip_file_get_error(self->zf);
+			stream->eof = 1;
+			php_error_docref(NULL, E_WARNING, "Zip stream error: %s", zip_error_strerror(err));
+			zip_error_fini(err);
+#endif
+			return -1;
 		}
 		/* cast count to signed value to avoid possibly negative n
 		 * being cast to unsigned value */
@@ -66,15 +75,15 @@ static size_t php_zip_ops_read(php_stream *stream, char *buf, size_t count)
 			self->cursor += n;
 		}
 	}
-	return (n < 1 ? 0 : (size_t)n);
+	return n;
 }
 /* }}} */
 
 /* {{{ php_zip_ops_write */
-static size_t php_zip_ops_write(php_stream *stream, const char *buf, size_t count)
+static ssize_t php_zip_ops_write(php_stream *stream, const char *buf, size_t count)
 {
 	if (!stream) {
-		return 0;
+		return -1;
 	}
 
 	return count;
@@ -117,11 +126,11 @@ static int php_zip_ops_stat(php_stream *stream, php_stream_statbuf *ssb) /* {{{ 
 {
 	struct zip_stat sb;
 	const char *path = stream->orig_path;
-	int path_len = strlen(stream->orig_path);
+	size_t path_len = strlen(stream->orig_path);
 	char file_dirname[MAXPATHLEN];
 	struct zip *za;
 	char *fragment;
-	int fragment_len;
+	size_t fragment_len;
 	int err;
 	zend_string *file_basename;
 
@@ -152,7 +161,7 @@ static int php_zip_ops_stat(php_stream *stream, php_stream_statbuf *ssb) /* {{{ 
 	fragment++;
 
 	if (ZIP_OPENBASEDIR_CHECKPATH(file_dirname)) {
-		zend_string_release(file_basename);
+		zend_string_release_ex(file_basename, 0);
 		return -1;
 	}
 
@@ -161,7 +170,7 @@ static int php_zip_ops_stat(php_stream *stream, php_stream_statbuf *ssb) /* {{{ 
 		memset(ssb, 0, sizeof(php_stream_statbuf));
 		if (zip_stat(za, fragment, ZIP_FL_NOCASE, &sb) != 0) {
 			zip_close(za);
-			zend_string_release(file_basename);
+			zend_string_release_ex(file_basename, 0);
 			return -1;
 		}
 		zip_close(za);
@@ -185,12 +194,12 @@ static int php_zip_ops_stat(php_stream *stream, php_stream_statbuf *ssb) /* {{{ 
 #endif
 		ssb->sb.st_ino = -1;
 	}
-	zend_string_release(file_basename);
+	zend_string_release_ex(file_basename, 0);
 	return 0;
 }
 /* }}} */
 
-php_stream_ops php_stream_zipio_ops = {
+const php_stream_ops php_stream_zipio_ops = {
 	php_zip_ops_write, php_zip_ops_read,
 	php_zip_ops_close, php_zip_ops_flush,
 	"zip",
@@ -257,7 +266,7 @@ php_stream *php_stream_zip_opener(php_stream_wrapper *wrapper,
 											zend_string **opened_path,
 											php_stream_context *context STREAMS_DC)
 {
-	int path_len;
+	size_t path_len;
 
 	zend_string *file_basename;
 	char file_dirname[MAXPATHLEN];
@@ -265,7 +274,7 @@ php_stream *php_stream_zip_opener(php_stream_wrapper *wrapper,
 	struct zip *za;
 	struct zip_file *zf = NULL;
 	char *fragment;
-	int fragment_len;
+	size_t fragment_len;
 	int err;
 
 	php_stream *stream = NULL;
@@ -297,12 +306,20 @@ php_stream *php_stream_zip_opener(php_stream_wrapper *wrapper,
 	fragment++;
 
 	if (ZIP_OPENBASEDIR_CHECKPATH(file_dirname)) {
-		zend_string_release(file_basename);
+		zend_string_release_ex(file_basename, 0);
 		return NULL;
 	}
 
 	za = zip_open(file_dirname, ZIP_CREATE, &err);
 	if (za) {
+		zval *tmpzval;
+
+		if (context && NULL != (tmpzval = php_stream_context_get_option(context, "zip", "password"))) {
+			if (Z_TYPE_P(tmpzval) != IS_STRING || zip_set_default_password(za, Z_STRVAL_P(tmpzval))) {
+				php_error_docref(NULL, E_WARNING, "Can't set zip password");
+			}
+		}
+
 		zf = zip_fopen(za, fragment, 0);
 		if (zf) {
 			self = emalloc(sizeof(*self));
@@ -321,7 +338,7 @@ php_stream *php_stream_zip_opener(php_stream_wrapper *wrapper,
 		}
 	}
 
-	zend_string_release(file_basename);
+	zend_string_release_ex(file_basename, 0);
 
 	if (!stream) {
 		return NULL;
@@ -331,7 +348,7 @@ php_stream *php_stream_zip_opener(php_stream_wrapper *wrapper,
 }
 /* }}} */
 
-static php_stream_wrapper_ops zip_stream_wops = {
+static const php_stream_wrapper_ops zip_stream_wops = {
 	php_stream_zip_opener,
 	NULL,	/* close */
 	NULL,	/* fstat */
@@ -341,13 +358,13 @@ static php_stream_wrapper_ops zip_stream_wops = {
 	NULL,	/* unlink */
 	NULL,	/* rename */
 	NULL,	/* mkdir */
-	NULL	/* rmdir */
+	NULL,	/* rmdir */
+	NULL	/* metadata */
 };
 
-php_stream_wrapper php_stream_zip_wrapper = {
+const php_stream_wrapper php_stream_zip_wrapper = {
 	&zip_stream_wops,
 	NULL,
 	0 /* is_url */
 };
-#endif /* defined(ZEND_ENGINE_2) || defined(ZEND_ENGINE_3) */
 #endif /* HAVE_ZIP */

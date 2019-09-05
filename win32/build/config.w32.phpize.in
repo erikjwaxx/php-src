@@ -1,7 +1,9 @@
 // vim:ft=javascript
-// $Id: config.w32 306241 2010-12-11 22:18:10Z pajoye $
-// "Master" config file; think of it as a configure.in
+// "Master" config file; think of it as a configure.ac
 // equivalent.
+
+ARG_WITH("verbosity", "Output verbosity, 0-2.", "1");
+setup_verbosity();
 
 ARG_WITH("toolset", "Toolset to use for the compilation, give: vs, clang, icc. " +
 		"The only recommended and supported toolset for production use " +
@@ -14,9 +16,6 @@ toolset_setup_compiler();
 
 // do we use x64 or 80x86 version of compiler?
 X64 = toolset_is_64();
-if (!X64) {
-	ERROR("64-bit compiler required");
-}
 toolset_setup_arch();
 
 toolset_setup_linker();
@@ -26,7 +25,7 @@ toolset_setup_project_tools();
 ARG_ENABLE('object-out-dir', 'Alternate location for binary objects during build', '');
 object_out_dir_option_handle();
 
-ARG_ENABLE('debug', 'Compile with debugging symbols', "no");
+ARG_ENABLE('debug', 'Compile with debugging symbols', PHP_DEBUG);
 ARG_ENABLE('debug-pack', 'Release binaries with external debug symbols (--enable-debug must not be specified)', 'no');
 if (PHP_DEBUG == "yes" && PHP_DEBUG_PACK == "yes") {
 	ERROR("Use of both --enable-debug and --enable-debug-pack not allowed.");
@@ -43,11 +42,11 @@ DEFINE("BASE_INCLUDES", "/I " + PHP_DIR + "/include /I " + PHP_DIR + "/include/m
 
 toolset_setup_common_cflags();
 
-ARG_WITH('prefix', 'PHP installation prefix', '');
+ARG_WITH('prefix', 'PHP installation prefix', PHP_PREFIX);
 ARG_WITH('mp', 'Tell Visual Studio use up to [n,auto,disable] processes for compilation', 'auto');
 var PHP_MP_DISABLED = true;
-if (VS_TOOLSET && VCVERS >= 1500 && PHP_MP != 'disable') {
-		// no from disable-all 
+if (VS_TOOLSET && PHP_MP != 'disable') {
+		// no from disable-all
 		if(PHP_MP == 'auto' || PHP_MP == 'no') {
 			 ADD_FLAG('CFLAGS', ' /MP ');
 			PHP_MP_DISABLED = false;
@@ -106,13 +105,9 @@ STDOUT.WriteLine("Build dir: " + get_define('BUILD_DIR'));
 STDOUT.WriteLine("PHP Core:  " + get_define('PHPDLL') + " and " + get_define('PHPLIB'));
 
 /* XXX inspect this for other toolsets */
-if (VS_TOOLSET && VCVERS == 1200) {
-	AC_DEFINE('ZEND_DVAL_TO_LVAL_CAST_OK', 1);
-}
+//AC_DEFINE('ZEND_DVAL_TO_LVAL_CAST_OK', 1);
 
-if (!VS_TOOLSET || VS_TOOLSET && VCVERS >= 1400) {
-	AC_DEFINE('HAVE_STRNLEN', 1);
-}
+AC_DEFINE('HAVE_STRNLEN', 1);
 
 STDOUT.WriteBlankLines(1);
 
@@ -133,3 +128,10 @@ DEFINE("PHP_DIR", PHP_DIR);
 ARG_WITH("codegen-arch", "Architecture for code generation", "no");
 toolset_setup_codegen_arch();
 
+ARG_ENABLE("native-intrinsics", "Comma separated list of intrinsic optimizations to enable. \
+	Available optimization names are sse, sse2, sse3, ssse3, sse4.1, sse4.2, avx, avx2. \
+	SSE and SSE2 are enabled by default. The best optimization specified will \
+	automatically enable all the older optimizations. Note, that the produced binary \
+	might not work properly, if the optimizations are not available on the target \
+	processor.", "no");
+toolset_setup_intrinsic_cflags();

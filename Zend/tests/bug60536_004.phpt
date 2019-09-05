@@ -2,10 +2,9 @@
 Introducing new private variables of the same name in a subclass is ok, and does not lead to any output. That is consitent with normal inheritance handling. (relevant to #60536)
 --FILE--
 <?php
-error_reporting(E_ALL | E_STRICT);
 
 class Base {
-  private $hello;    
+  private $hello;
 }
 
 trait THello1 {
@@ -29,9 +28,7 @@ class Notice extends Base {
 }
 echo "POST-CLASS-GUARD2\n";
 ?>
---EXPECTF--	
+--EXPECT--
 PRE-CLASS-GUARD
 POST-CLASS-GUARD
-
-Strict Standards: Notice and THello1 define the same property ($hello) in the composition of Notice. This might be incompatible, to improve maintainability consider using accessor methods in traits instead. Class was composed in %sbug60536_004.php on line %d
 POST-CLASS-GUARD2

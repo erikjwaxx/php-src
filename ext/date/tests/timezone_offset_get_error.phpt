@@ -13,68 +13,71 @@ date_default_timezone_set("GMT");
 $tz = timezone_open("Europe/London");
 $date = date_create("GMT");
 
-set_error_handler('err');
-
-function err($errno, $errstr) {
-	if ($errno === E_RECOVERABLE_ERROR) {
-		var_dump($errstr);
-	}
-}
-
 echo "*** Testing timezone_offset_get() : error conditions ***\n";
-
-echo "\n-- Testing timezone_offset_get() function with zero arguments --\n";
-var_dump( timezone_offset_get() );
-
-echo "\n-- Testing timezone_offset_get() function with less than expected no. of arguments --\n";
-var_dump( timezone_offset_get($tz) );
-
-echo "\n-- Testing timezone_offset_get() function with more than expected no. of arguments --\n";
-$extra_arg = 99;
-var_dump( timezone_offset_get($tz, $date, $extra_arg) );
 
 echo "\n-- Testing timezone_offset_get() function with an invalid values for \$object argument --\n";
 $invalid_obj = new stdClass();
-var_dump( timezone_offset_get($invalid_obj, $date) );
+try {
+	var_dump( timezone_offset_get($invalid_obj, $date) );
+} catch (Error $ex) {
+	var_dump($ex->getMessage());
+	echo "\n";
+}
 $invalid_obj = 10;
-var_dump( timezone_offset_get($invalid_obj, $date) );
+try {
+	var_dump( timezone_offset_get($invalid_obj, $date) );
+} catch (Error $ex) {
+	var_dump($ex->getMessage());
+	echo "\n";
+}
 $invalid_obj = null;
-var_dump( timezone_offset_get($invalid_obj, $date) );
+try {
+	var_dump( timezone_offset_get($invalid_obj, $date) );
+} catch (Error $ex) {
+	var_dump($ex->getMessage());
+	echo "\n";
+}
 
 echo "\n-- Testing timezone_offset_get() function with an invalid values for \$datetime argument --\n";
 $invalid_obj = new stdClass();
-var_dump( timezone_offset_get($tz, $invalid_obj) );
+try {
+	var_dump( timezone_offset_get($tz, $invalid_obj) );
+} catch (Error $ex) {
+	var_dump($ex->getMessage());
+	echo "\n";
+}
 $invalid_obj = 10;
-var_dump( timezone_offset_get($tz, $invalid_obj) );
+try {
+	var_dump( timezone_offset_get($tz, $invalid_obj) );
+} catch (Error $ex) {
+	var_dump($ex->getMessage());
+	echo "\n";
+}
 $invalid_obj = null;
-var_dump( timezone_offset_get($tz, $invalid_obj) );
+try {
+	var_dump( timezone_offset_get($tz, $invalid_obj) );
+} catch (Error $ex) {
+	var_dump($ex->getMessage());
+	echo "\n";
+}
 ?>
 ===DONE===
---EXPECTF--
+--EXPECT--
 *** Testing timezone_offset_get() : error conditions ***
 
--- Testing timezone_offset_get() function with zero arguments --
-bool(false)
-
--- Testing timezone_offset_get() function with less than expected no. of arguments --
-bool(false)
-
--- Testing timezone_offset_get() function with more than expected no. of arguments --
-bool(false)
-
 -- Testing timezone_offset_get() function with an invalid values for $object argument --
-string(%d) "Argument 1 passed to timezone_offset_get() must be an instance of DateTimeZone, instance of stdClass given"
-bool(false)
-string(%d) "Argument 1 passed to timezone_offset_get() must be an instance of DateTimeZone, integer given"
-bool(false)
-string(%d) "Argument 1 passed to timezone_offset_get() must be an instance of DateTimeZone, null given"
-bool(false)
+string(74) "timezone_offset_get() expects parameter 1 to be DateTimeZone, object given"
+
+string(71) "timezone_offset_get() expects parameter 1 to be DateTimeZone, int given"
+
+string(72) "timezone_offset_get() expects parameter 1 to be DateTimeZone, null given"
+
 
 -- Testing timezone_offset_get() function with an invalid values for $datetime argument --
-string(%d) "Argument 2 passed to timezone_offset_get() must implement interface DateTimeInterface, instance of stdClass given"
-bool(false)
-string(%d) "Argument 2 passed to timezone_offset_get() must implement interface DateTimeInterface, integer given"
-bool(false)
-string(%d) "Argument 2 passed to timezone_offset_get() must implement interface DateTimeInterface, null given"
-bool(false)
+string(79) "timezone_offset_get() expects parameter 2 to be DateTimeInterface, object given"
+
+string(76) "timezone_offset_get() expects parameter 2 to be DateTimeInterface, int given"
+
+string(77) "timezone_offset_get() expects parameter 2 to be DateTimeInterface, null given"
+
 ===DONE===

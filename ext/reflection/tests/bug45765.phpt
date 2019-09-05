@@ -9,21 +9,21 @@ class foo2 {
 
 class foo extends foo2 {
 	const BAR = "foo's bar";
-	
+
 	function test($a = self::BAR) {
 	}
-	
+
 	function test2($a = parent::BAR) {
 	}
 
 	function test3($a = foo::BAR) {
 	}
-	
+
 	function test4($a = foo2::BAR) {
 	}
 }
 
-ReflectionObject::export(new foo);
+echo new ReflectionObject(new foo);
 
 ?>
 --EXPECTF--
@@ -31,7 +31,7 @@ Object of class [ <user> class foo extends foo2 ] {
   @@ %s 7-21
 
   - Constants [1] {
-    Constant [ string BAR ] { foo's bar }
+    Constant [ public string BAR ] { foo's bar }
   }
 
   - Static properties [0] {

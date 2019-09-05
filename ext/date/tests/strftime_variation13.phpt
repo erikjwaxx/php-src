@@ -1,23 +1,17 @@
 --TEST--
-Test strftime() function : usage variation - Checking date related formats which are not supported on Windows.
---SKIPIF--
-<?php
-if (strtoupper(substr(PHP_OS, 0, 3)) != 'WIN') {
-    die("skip Test is valid for Windows");
-}
-?>
+Test strftime() function : usage variation - Checking date related formats which was not supported on Windows before VC14.
 --FILE--
 <?php
 /* Prototype  : string strftime(string format [, int timestamp])
- * Description: Format a local time/date according to locale settings 
+ * Description: Format a local time/date according to locale settings
  * Source code: ext/date/php_date.c
- * Alias to functions: 
+ * Alias to functions:
  */
 
 echo "*** Testing strftime() : usage variation ***\n";
 
 // Initialise function arguments not being substituted (if any)
-setlocale(LC_ALL, "en_US");
+setlocale(LC_ALL, "C");
 date_default_timezone_set("Asia/Calcutta");
 $timestamp = mktime(8, 8, 8, 8, 8, 2008);
 
@@ -35,7 +29,7 @@ foreach($inputs as $key =>$value) {
       echo "\n--$key--\n";
 	  var_dump( strftime($value) );
 	  var_dump( strftime($value, $timestamp) );
-}	  
+}
 
 ?>
 ===DONE===
@@ -43,18 +37,18 @@ foreach($inputs as $key =>$value) {
 *** Testing strftime() : usage variation ***
 
 --Century number--
-bool(false)
-bool(false)
+string(2) "20"
+string(2) "20"
 
 --Month Date Year--
-bool(false)
-bool(false)
+string(%d) "%d/%d/%d"
+string(8) "08/08/08"
 
 --Year with century--
-bool(false)
-bool(false)
+string(4) "%d"
+string(4) "2008"
 
 --Year without century--
-bool(false)
-bool(false)
+string(2) "%d"
+string(2) "08"
 ===DONE===

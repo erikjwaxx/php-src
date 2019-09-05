@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | PHP Version 7                                                        |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1997-2015 The PHP Group                                |
+   | Copyright (c) The PHP Group                                          |
    +----------------------------------------------------------------------+
    | This source file is subject to version 3.01 of the PHP license,      |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -13,11 +13,9 @@
    | license@php.net so we can mail you a copy immediately.               |
    +----------------------------------------------------------------------+
    | Authors: Rasmus Lerdorf <rasmus@lerdorf.on.ca>                       |
-   |          Zeev Suraski <zeev@zend.com>                                |
+   |          Zeev Suraski <zeev@php.net>                                 |
    +----------------------------------------------------------------------+
 */
-
-/* $Id$ */
 
 #ifndef PHP_VARIABLES_H
 #define PHP_VARIABLES_H
@@ -41,6 +39,7 @@ PHPAPI void php_register_variable(char *var, char *val, zval *track_vars_array);
 PHPAPI void php_register_variable_safe(char *var, char *val, size_t val_len, zval *track_vars_array);
 PHPAPI void php_register_variable_ex(char *var, zval *val, zval *track_vars_array);
 
+PHPAPI void php_build_argv(char *s, zval *track_vars_array);
 PHPAPI int php_hash_environment(void);
 END_EXTERN_C()
 

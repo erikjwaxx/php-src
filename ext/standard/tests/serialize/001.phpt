@@ -3,10 +3,10 @@ serialize()/unserialize()/var_dump()
 --INI--
 serialize_precision=100
 --FILE--
-<?php 
+<?php
 class t
 {
-	function t()
+	function __construct()
 	{
 		$this->a = "hallo";
 	}
@@ -18,7 +18,7 @@ class s
 	public $b;
 	public $c;
 
-	function s()
+	function __construct()
 	{
 		$this->a = "hallo";
 		$this->b = "php";

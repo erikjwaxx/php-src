@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | PHP Version 7                                                        |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1997-2015 The PHP Group                                |
+   | Copyright (c) The PHP Group                                          |
    +----------------------------------------------------------------------+
    | This source file is subject to version 3.01 of the PHP license,      |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -29,7 +29,7 @@
  *    PS_READ_FUNC()  - Read data from storage.
  *    PS_GC_FUNC()    - Perform GC. Called by probability
  *                                (session.gc_probability/session.gc_divisor).
- *    PS_WRITE_FUNC() or PS_UPDATE_TIMESTAMP() 
+ *    PS_WRITE_FUNC() or PS_UPDATE_TIMESTAMP()
  *                    - Write session data or update session data timestamp.
  *                      It depends on session data change.
  *    PS_CLOSE_FUNC() - Clean up module data created by PS_OPEN_FUNC().
@@ -100,7 +100,7 @@ typedef struct {
 	int fd;
 } ps_files;
 
-ps_module ps_mod_files = {
+const ps_module ps_mod_files = {
 	/* New save handlers MUST use PS_MOD_UPDATE_TIMESTAMP macro */
 	PS_MOD_UPDATE_TIMESTAMP(files)
 };
@@ -111,10 +111,10 @@ static char *ps_files_path_create(char *buf, size_t buflen, ps_files *data, cons
 	size_t key_len;
 	const char *p;
 	int i;
-	int n;
+	size_t n;
 
 	key_len = strlen(key);
-	if (key_len <= data->dirdepth ||
+	if (!data || key_len <= data->dirdepth ||
 		buflen < (strlen(data->basedir) + 2 * data->dirdepth + key_len + 5 + sizeof(FILE_PREFIX))) {
 		return NULL;
 	}
@@ -175,6 +175,7 @@ static void ps_files_open(ps_files *data, const char *key)
 		}
 
 		if (!ps_files_path_create(buf, sizeof(buf), data, key)) {
+			php_error_docref(NULL, E_WARNING, "Failed to create session data file path. Too short session ID, invalid save_path or path lentgth exceeds MAXPATHLEN(%d)", MAXPATHLEN);
 			return;
 		}
 
@@ -195,10 +196,17 @@ static void ps_files_open(ps_files *data, const char *key)
 		if (data->fd != -1) {
 #ifndef PHP_WIN32
 			/* check that this session file was created by us or root – we
-			   don't want to end up accepting the sessions of another webapp */
-			if (fstat(data->fd, &sbuf) || (sbuf.st_uid != 0 && sbuf.st_uid != getuid() && sbuf.st_uid != geteuid())) {
+			   don't want to end up accepting the sessions of another webapp
+
+			   If the process is ran by root, we ignore session file ownership
+			   Use case: session is initiated by Apache under non-root and then
+			   accessed by backend with root permissions to execute some system tasks.
+
+			   */
+			if (zend_fstat(data->fd, &sbuf) || (sbuf.st_uid != 0 && sbuf.st_uid != getuid() && sbuf.st_uid != geteuid() && getuid() != 0)) {
 				close(data->fd);
 				data->fd = -1;
+				php_error_docref(NULL, E_WARNING, "Session data file is not created by your uid");
 				return;
 			}
 #endif
@@ -222,30 +230,47 @@ static void ps_files_open(ps_files *data, const char *key)
 
 static int ps_files_write(ps_files *data, zend_string *key, zend_string *val)
 {
-	zend_long n;
+	size_t n = 0;
 
 	/* PS(id) may be changed by calling session_regenerate_id().
 	   Re-initialization should be tried here. ps_files_open() checks
        data->lastkey and reopen when it is needed. */
-	ps_files_open(data, key->val);
+	ps_files_open(data, ZSTR_VAL(key));
 	if (data->fd < 0) {
 		return FAILURE;
 	}
 
 	/* Truncate file if the amount of new data is smaller than the existing data set. */
-	if (val->len < (int)data->st_size) {
+	if (ZSTR_LEN(val) < data->st_size) {
 		php_ignore_value(ftruncate(data->fd, 0));
 	}
 
 #if defined(HAVE_PWRITE)
-	n = pwrite(data->fd, val->val, val->len, 0);
+	n = pwrite(data->fd, ZSTR_VAL(val), ZSTR_LEN(val), 0);
 #else
 	lseek(data->fd, 0, SEEK_SET);
-	n = write(data->fd, val->val, val->len);
+#ifdef PHP_WIN32
+	{
+		unsigned int to_write = ZSTR_LEN(val) > UINT_MAX ? UINT_MAX : (unsigned int)ZSTR_LEN(val);
+		char *buf = ZSTR_VAL(val);
+		int wrote;
+
+		do {
+			wrote = _write(data->fd, buf, to_write);
+
+			n += wrote;
+			buf = wrote > -1 ? buf + wrote : 0;
+			to_write = wrote > -1 ? (ZSTR_LEN(val) - n > UINT_MAX ? UINT_MAX : (unsigned int)(ZSTR_LEN(val) - n)): 0;
+
+		} while(wrote > 0);
+	}
+#else
+	n = write(data->fd, ZSTR_VAL(val), ZSTR_LEN(val));
+#endif
 #endif
 
-	if (n != val->len) {
-		if (n == -1) {
+	if (n != ZSTR_LEN(val)) {
+		if (n == (size_t)-1) {
 			php_error_docref(NULL, E_WARNING, "write failed: %s (%d)", strerror(errno), errno);
 		} else {
 			php_error_docref(NULL, E_WARNING, "write wrote less bytes than requested");
@@ -256,11 +281,10 @@ static int ps_files_write(ps_files *data, zend_string *key, zend_string *val)
 	return SUCCESS;
 }
 
-static int ps_files_cleanup_dir(const char *dirname, int maxlifetime)
+static int ps_files_cleanup_dir(const char *dirname, zend_long maxlifetime)
 {
 	DIR *dir;
-	char dentry[sizeof(struct dirent) + MAXPATHLEN];
-	struct dirent *entry = (struct dirent *) &dentry;
+	struct dirent *entry;
 	zend_stat_t sbuf;
 	char buf[MAXPATHLEN];
 	time_t now;
@@ -277,11 +301,17 @@ static int ps_files_cleanup_dir(const char *dirname, int maxlifetime)
 
 	dirname_len = strlen(dirname);
 
+	if (dirname_len >= MAXPATHLEN) {
+		php_error_docref(NULL, E_NOTICE, "ps_files_cleanup_dir: dirname(%s) is too long", dirname);
+		closedir(dir);
+		return (0);
+	}
+
 	/* Prepare buffer (dirname never changes) */
 	memcpy(buf, dirname, dirname_len);
 	buf[dirname_len] = PHP_DIR_SEPARATOR;
 
-	while (php_readdir_r(dir, (struct dirent *) dentry, &entry) == 0 && entry) {
+	while ((entry = readdir(dir))) {
 		/* does the file start with our prefix? */
 		if (!strncmp(entry->d_name, FILE_PREFIX, sizeof(FILE_PREFIX) - 1)) {
 			size_t entry_len = strlen(entry->d_name);
@@ -378,7 +408,7 @@ PS_OPEN_FUNC(files)
 
 	if (argc > 2) {
 		errno = 0;
-		filemode = ZEND_STRTOL(argv[1], NULL, 8);
+		filemode = (int)ZEND_STRTOL(argv[1], NULL, 8);
 		if (errno == ERANGE || filemode < 0 || filemode > 07777) {
 			php_error(E_WARNING, "The second parameter in session.save_path is invalid");
 			return FAILURE;
@@ -421,11 +451,12 @@ PS_CLOSE_FUNC(files)
 
 	if (data->lastkey) {
 		efree(data->lastkey);
+		data->lastkey = NULL;
 	}
 
 	efree(data->basedir);
 	efree(data);
-	*mod_data = NULL;
+	PS_SET_MOD_DATA(NULL);
 
 	return SUCCESS;
 }
@@ -443,11 +474,11 @@ PS_CLOSE_FUNC(files)
  */
 PS_READ_FUNC(files)
 {
-	zend_long n;
+	zend_long n = 0;
 	zend_stat_t sbuf;
 	PS_FILES_DATA;
 
-	ps_files_open(data, key->val);
+	ps_files_open(data, ZSTR_VAL(key));
 	if (data->fd < 0) {
 		return FAILURE;
 	}
@@ -459,30 +490,49 @@ PS_READ_FUNC(files)
 	data->st_size = sbuf.st_size;
 
 	if (sbuf.st_size == 0) {
-		*val = STR_EMPTY_ALLOC();
+		*val = ZSTR_EMPTY_ALLOC();
 		return SUCCESS;
 	}
 
 	*val = zend_string_alloc(sbuf.st_size, 0);
 
 #if defined(HAVE_PREAD)
-	n = pread(data->fd, (*val)->val, (*val)->len, 0);
+	n = pread(data->fd, ZSTR_VAL(*val), ZSTR_LEN(*val), 0);
 #else
 	lseek(data->fd, 0, SEEK_SET);
-	n = read(data->fd, (*val)->val, (*val)->len);
+#ifdef PHP_WIN32
+	{
+		unsigned int to_read = ZSTR_LEN(*val) > UINT_MAX ? UINT_MAX : (unsigned int)ZSTR_LEN(*val);
+		char *buf = ZSTR_VAL(*val);
+		int read_in;
+
+		do {
+			read_in = _read(data->fd, buf, to_read);
+
+			n += read_in;
+			buf = read_in > -1 ? buf + read_in : 0;
+			to_read = read_in > -1 ? (ZSTR_LEN(*val) - n > UINT_MAX ? UINT_MAX : (unsigned int)(ZSTR_LEN(*val) - n)): 0;
+
+		} while(read_in > 0);
+
+	}
+#else
+	n = read(data->fd, ZSTR_VAL(*val), ZSTR_LEN(*val));
+#endif
 #endif
 
-	if (n != sbuf.st_size) {
+	if (n != (zend_long)sbuf.st_size) {
 		if (n == -1) {
 			php_error_docref(NULL, E_WARNING, "read failed: %s (%d)", strerror(errno), errno);
 		} else {
 			php_error_docref(NULL, E_WARNING, "read returned less bytes than requested");
 		}
-		zend_string_release(*val);
-		*val =  STR_EMPTY_ALLOC();
+		zend_string_release_ex(*val, 0);
+		*val =  ZSTR_EMPTY_ALLOC();
 		return FAILURE;
 	}
 
+	ZSTR_VAL(*val)[ZSTR_LEN(*val)] = '\0';
 	return SUCCESS;
 }
 
@@ -520,22 +570,15 @@ PS_WRITE_FUNC(files)
 PS_UPDATE_TIMESTAMP_FUNC(files)
 {
 	char buf[MAXPATHLEN];
-	struct utimbuf newtimebuf;
-	struct utimbuf *newtime = &newtimebuf;
 	int ret;
 	PS_FILES_DATA;
 
-	if (!ps_files_path_create(buf, sizeof(buf), data, key->val)) {
+	if (!ps_files_path_create(buf, sizeof(buf), data, ZSTR_VAL(key))) {
 		return FAILURE;
 	}
 
 	/* Update mtime */
-#ifdef HAVE_UTIME_NULL
-	newtime = NULL;
-#else
-	newtime->modtime = newtime->actime = time(NULL);
-#endif
-	ret = VCWD_UTIME(buf, newtime);
+	ret = VCWD_UTIME(buf, NULL);
 	if (ret == -1) {
 		/* New session ID, create data file */
 		return ps_files_write(data, key, val);
@@ -560,7 +603,7 @@ PS_DESTROY_FUNC(files)
 	char buf[MAXPATHLEN];
 	PS_FILES_DATA;
 
-	if (!ps_files_path_create(buf, sizeof(buf), data, key->val)) {
+	if (!ps_files_path_create(buf, sizeof(buf), data, ZSTR_VAL(key))) {
 		return FAILURE;
 	}
 
@@ -601,9 +644,11 @@ PS_GC_FUNC(files)
 
 	if (data->dirdepth == 0) {
 		*nrdels = ps_files_cleanup_dir(data->basedir, maxlifetime);
+	} else {
+		*nrdels = -1; // Cannot process multiple depth save dir
 	}
 
-	return SUCCESS;
+	return *nrdels;
 }
 
 
@@ -637,9 +682,9 @@ PS_CREATE_SID_FUNC(files)
 		}
 		/* Check collision */
 		/* FIXME: mod_data(data) should not be NULL (User handler could be NULL) */
-		if (data && ps_files_key_exists(data, sid->val) == SUCCESS) {
+		if (data && ps_files_key_exists(data, ZSTR_VAL(sid)) == SUCCESS) {
 			if (sid) {
-				zend_string_release(sid);
+				zend_string_release_ex(sid, 0);
 				sid = NULL;
 			}
 			if (--maxfail < 0) {
@@ -665,14 +710,5 @@ PS_VALIDATE_SID_FUNC(files)
 {
 	PS_FILES_DATA;
 
-	return ps_files_key_exists(data, key->val);
+	return ps_files_key_exists(data, ZSTR_VAL(key));
 }
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: sw=4 ts=4 fdm=marker
- * vim<600: sw=4 ts=4
- */

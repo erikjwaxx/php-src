@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | Zend Engine                                                          |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1998-2015 Zend Technologies Ltd. (http://www.zend.com) |
+   | Copyright (c) Zend Technologies Ltd. (http://www.zend.com)           |
    +----------------------------------------------------------------------+
    | This source file is subject to version 2.00 of the Zend license,     |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -12,12 +12,10 @@
    | obtain it through the world-wide-web, please send a note to          |
    | license@zend.com so we can mail you a copy immediately.              |
    +----------------------------------------------------------------------+
-   | Authors: Andi Gutmans <andi@zend.com>                                |
-   |          Zeev Suraski <zeev@zend.com>                                |
+   | Authors: Andi Gutmans <andi@php.net>                                 |
+   |          Zeev Suraski <zeev@php.net>                                 |
    +----------------------------------------------------------------------+
 */
-
-/* $Id$ */
 
 #ifndef ZEND_GLOBALS_H
 #define ZEND_GLOBALS_H
@@ -36,6 +34,7 @@
 #include "zend_modules.h"
 #include "zend_float.h"
 #include "zend_multibyte.h"
+#include "zend_multiply.h"
 #include "zend_arena.h"
 
 /* Define ZTS if you want a thread-safe Zend */
@@ -46,6 +45,8 @@
 BEGIN_EXTERN_C()
 ZEND_API extern int compiler_globals_id;
 ZEND_API extern int executor_globals_id;
+ZEND_API extern size_t compiler_globals_offset;
+ZEND_API extern size_t executor_globals_offset;
 END_EXTERN_C()
 
 #endif
@@ -57,14 +58,6 @@ END_EXTERN_C()
 
 /* excpt.h on Digital Unix 4.0 defines function_table */
 #undef function_table
-
-#define ZEND_EARLY_BINDING_COMPILE_TIME 0
-#define ZEND_EARLY_BINDING_DELAYED      1
-#define ZEND_EARLY_BINDING_DELAYED_ALL  2
-
-typedef struct _zend_declarables {
-	zval ticks;
-} zend_declarables;
 
 typedef struct _zend_vm_stack *zend_vm_stack;
 typedef struct _zend_ini_entry zend_ini_entry;
@@ -92,8 +85,6 @@ struct _zend_compiler_globals {
 	zend_bool in_compilation;
 	zend_bool short_tags;
 
-	zend_declarables declarables;
-
 	zend_bool unclean_shutdown;
 
 	zend_bool ini_parser_unbuffered_errors;
@@ -102,31 +93,18 @@ struct _zend_compiler_globals {
 
 	struct _zend_ini_parser_param *ini_parser_param;
 
-	uint32_t start_lineno;
+	zend_bool skip_shebang;
 	zend_bool increment_lineno;
 
-	znode implementing_class;
-
 	zend_string *doc_comment;
+	uint32_t extra_fn_flags;
 
 	uint32_t compiler_options; /* set of ZEND_COMPILE_* constants */
 
-	zend_string *current_namespace;
-	HashTable *current_import;
-	HashTable *current_import_function;
-	HashTable *current_import_const;
-	zend_bool  in_namespace;
-	zend_bool  has_bracketed_namespaces;
-
-	HashTable const_filenames;
-
-	zend_compiler_context context;
-	zend_stack context_stack;
+	zend_oparray_context context;
+	zend_file_context file_context;
 
 	zend_arena *arena;
-
-	zend_string *empty_string;
-	zend_string *one_char_string[256];
 
 	HashTable interned_strings;
 
@@ -140,11 +118,15 @@ struct _zend_compiler_globals {
 	zend_arena *ast_arena;
 
 	zend_stack delayed_oplines_stack;
+	HashTable *memoized_exprs;
+	int memoize_mode;
 
-#ifdef ZTS
-	zval **static_members_table;
-	int last_static_member;
-#endif
+	void   *map_ptr_base;
+	size_t  map_ptr_size;
+	size_t  map_ptr_last;
+
+	HashTable *delayed_variance_obligations;
+	HashTable *delayed_autoloads;
 };
 
 
@@ -154,7 +136,9 @@ struct _zend_executor_globals {
 
 	/* symbol table cache */
 	zend_array *symtable_cache[SYMTABLE_CACHE_SIZE];
+	/* Pointer to one past the end of the symtable_cache */
 	zend_array **symtable_cache_limit;
+	/* Pointer to first unused symtable_cache slot */
 	zend_array **symtable_cache_ptr;
 
 	zend_array symbol_table;		/* main symbol table */
@@ -173,13 +157,18 @@ struct _zend_executor_globals {
 	zval          *vm_stack_top;
 	zval          *vm_stack_end;
 	zend_vm_stack  vm_stack;
+	size_t         vm_stack_page_size;
 
 	struct _zend_execute_data *current_execute_data;
-	zend_class_entry *scope;
+	zend_class_entry *fake_scope; /* used to avoid checks accessing properties */
 
 	zend_long precision;
 
 	int ticks_count;
+
+	uint32_t persistent_constants_count;
+	uint32_t persistent_functions_count;
+	uint32_t persistent_classes_count;
 
 	HashTable *in_autoload;
 	zend_function *autoload_func;
@@ -188,8 +177,11 @@ struct _zend_executor_globals {
 	/* for extended information support */
 	zend_bool no_extensions;
 
-#ifdef ZEND_WIN32
+	zend_bool vm_interrupt;
 	zend_bool timed_out;
+	zend_long hard_timeout;
+
+#ifdef ZEND_WIN32
 	OSVERSIONINFOEX windows_version_info;
 #endif
 
@@ -223,7 +215,7 @@ struct _zend_executor_globals {
 	struct _zend_module_entry *current_module;
 
 	zend_bool active;
-	zend_bool valid_symbol_table;
+	zend_uchar flags;
 
 	zend_long assertions;
 
@@ -237,8 +229,20 @@ struct _zend_executor_globals {
 	XPFPA_CW_DATATYPE saved_fpu_cw;
 #endif
 
+	zend_function trampoline;
+	zend_op       call_trampoline_op;
+
+	HashTable weakrefs;
+
+	zend_bool exception_ignore_args;
+
 	void *reserved[ZEND_MAX_RESERVED_RESOURCES];
 };
+
+#define EG_FLAGS_INITIAL				(0)
+#define EG_FLAGS_IN_SHUTDOWN			(1<<0)
+#define EG_FLAGS_OBJECT_STORE_NO_REUSE	(1<<1)
+#define EG_FLAGS_IN_RESOURCE_SHUTDOWN	(1<<2)
 
 struct _zend_ini_scanner_globals {
 	zend_file_handle *yy_in;
@@ -260,6 +264,12 @@ struct _zend_ini_scanner_globals {
 	int scanner_mode;
 };
 
+typedef enum {
+	ON_TOKEN,
+	ON_FEEDBACK,
+	ON_STOP
+} zend_php_scanner_event;
+
 struct _zend_php_scanner_globals {
 	zend_file_handle *yy_in;
 	zend_file_handle *yy_out;
@@ -273,6 +283,9 @@ struct _zend_php_scanner_globals {
 	int yy_state;
 	zend_stack state_stack;
 	zend_ptr_stack heredoc_label_stack;
+	zend_bool heredoc_scan_ahead;
+	int heredoc_indentation;
+	zend_bool heredoc_indentation_uses_spaces;
 
 	/* original (unfiltered) script */
 	unsigned char *script_org;
@@ -289,14 +302,10 @@ struct _zend_php_scanner_globals {
 
 	/* initial string length after scanning to first variable */
 	int scanned_string_len;
+
+	/* hooks */
+	void (*on_event)(zend_php_scanner_event event, int token, int line, void *context);
+	void *on_event_context;
 };
 
 #endif /* ZEND_GLOBALS_H */
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * indent-tabs-mode: t
- * End:
- */

@@ -17,7 +17,8 @@ $data = array(
 	'%^',
 	'#&;`|*?',
 	'~<>\\',
-	'%NOENV%'
+	'%NOENV%',
+	'!NOENV!'
 );
 
 $count = 1;
@@ -28,7 +29,7 @@ foreach ($data AS $value) {
 
 echo "Done\n";
 ?>
---EXPECTF--
+--EXPECT--
 *** Testing escapeshellcmd() basic operations ***
 -- Test 1 --
 string(5) "^"abc"
@@ -46,4 +47,6 @@ string(14) "^#^&^;^`^|^*^?"
 string(8) "^~^<^>^\"
 -- Test 8 --
 string(9) "^%NOENV^%"
+-- Test 9 --
+string(9) "^!NOENV^!"
 Done

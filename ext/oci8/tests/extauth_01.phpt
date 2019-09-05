@@ -4,7 +4,7 @@ Test External Authentication errors with oci_connect
 <?php
 if (!extension_loaded('oci8')) die ("skip no oci8 extension");
 if (substr(PHP_OS, 0, 3) == 'WIN') die("skip feature not available on Windows platforms");
-require(dirname(__FILE__).'/details.inc');
+require(__DIR__.'/details.inc');
 if (getenv('SKIP_SLOW_TESTS')) die('skip slow tests excluded by request');
 ?>
 --INI--
@@ -88,7 +88,7 @@ var_dump($c);
 
 echo "Test 9\n";
 
-$c = oci_connect('/', '', 'c', null, OCI_SYSDBA+OCI_CRED_EXT);
+$c = oci_connect('/', '', 'd', null, OCI_SYSDBA+OCI_CRED_EXT);
 if (!$c) {
 	$m = oci_error();
 	var_dump($m);
@@ -97,7 +97,7 @@ var_dump($c);
 
 echo "Test 10\n";
 
-$c = oci_connect('/', '', 'c', null, OCI_SYSOPER+OCI_CRED_EXT);
+$c = oci_connect('/', '', 'd', null, OCI_SYSOPER+OCI_CRED_EXT);
 if (!$c) {
 	$m = oci_error();
 	var_dump($m);

@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | PHP Version 7                                                        |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1997-2015 The PHP Group                                |
+   | Copyright (c) The PHP Group                                          |
    +----------------------------------------------------------------------+
    | This source file is subject to version 3.01 of the PHP license,      |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -15,8 +15,6 @@
    | Authors: Sara Golemon (pollita@php.net)                              |
    +----------------------------------------------------------------------+
 */
-
-/* $Id$ */
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -193,7 +191,7 @@ static void php_bz2_decompress_dtor(php_stream_filter *thisfilter)
 	}
 }
 
-static php_stream_filter_ops php_bz2_decompress_ops = {
+static const php_stream_filter_ops php_bz2_decompress_ops = {
 	php_bz2_decompress_filter,
 	php_bz2_decompress_dtor,
 	"bzip2.decompress"
@@ -297,7 +295,7 @@ static void php_bz2_compress_dtor(php_stream_filter *thisfilter)
 	}
 }
 
-static php_stream_filter_ops php_bz2_compress_ops = {
+static const php_stream_filter_ops php_bz2_compress_ops = {
 	php_bz2_compress_filter,
 	php_bz2_compress_dtor,
 	"bzip2.compress"
@@ -307,18 +305,14 @@ static php_stream_filter_ops php_bz2_compress_ops = {
 
 /* {{{ bzip2.* common factory */
 
-static php_stream_filter *php_bz2_filter_create(const char *filtername, zval *filterparams, int persistent)
+static php_stream_filter *php_bz2_filter_create(const char *filtername, zval *filterparams, uint8_t persistent)
 {
-	php_stream_filter_ops *fops = NULL;
+	const php_stream_filter_ops *fops = NULL;
 	php_bz2_filter_data *data;
 	int status = BZ_OK;
 
 	/* Create this filter */
 	data = pecalloc(1, sizeof(php_bz2_filter_data), persistent);
-	if (!data) {
-		php_error_docref(NULL, E_WARNING, "Failed allocating %zu bytes", sizeof(php_bz2_filter_data));
-		return NULL;
-	}
 
 	/* Circular reference */
 	data->strm.opaque = (void *) data;
@@ -328,19 +322,8 @@ static php_stream_filter *php_bz2_filter_create(const char *filtername, zval *fi
 	data->persistent = persistent;
 	data->strm.avail_out = data->outbuf_len = data->inbuf_len = 2048;
 	data->strm.next_in = data->inbuf = (char *) pemalloc(data->inbuf_len, persistent);
-	if (!data->inbuf) {
-		php_error_docref(NULL, E_WARNING, "Failed allocating %zu bytes", data->inbuf_len);
-		pefree(data, persistent);
-		return NULL;
-	}
 	data->strm.avail_in = 0;
 	data->strm.next_out = data->outbuf = (char *) pemalloc(data->outbuf_len, persistent);
-	if (!data->outbuf) {
-		php_error_docref(NULL, E_WARNING, "Failed allocating %zu bytes", data->outbuf_len);
-		pefree(data->inbuf, persistent);
-		pefree(data, persistent);
-		return NULL;
-	}
 
 	if (strcasecmp(filtername, "bzip2.decompress") == 0) {
 		data->small_footprint = 0;
@@ -377,28 +360,21 @@ static php_stream_filter *php_bz2_filter_create(const char *filtername, zval *fi
 			if (Z_TYPE_P(filterparams) == IS_ARRAY || Z_TYPE_P(filterparams) == IS_OBJECT) {
 				if ((tmpzval = zend_hash_str_find(HASH_OF(filterparams), "blocks", sizeof("blocks")-1))) {
 					/* How much memory to allocate (1 - 9) x 100kb */
-					zval tmp;
-
-					ZVAL_DUP(&tmp, tmpzval);
-					convert_to_long(&tmp);
-					if (Z_LVAL(tmp) < 1 || Z_LVAL(tmp) > 9) {
-						php_error_docref(NULL, E_WARNING, "Invalid parameter given for number of blocks to allocate. (%pd)", Z_LVAL_P(tmpzval));
+					zend_long blocks = zval_get_long(tmpzval);
+					if (blocks < 1 || blocks > 9) {
+						php_error_docref(NULL, E_WARNING, "Invalid parameter given for number of blocks to allocate. (" ZEND_LONG_FMT ")", blocks);
 					} else {
-						blockSize100k = (int)Z_LVAL(tmp);
+						blockSize100k = (int) blocks;
 					}
 				}
 
 				if ((tmpzval = zend_hash_str_find(HASH_OF(filterparams), "work", sizeof("work")-1))) {
 					/* Work Factor (0 - 250) */
-					zval tmp;
-
-					ZVAL_DUP(&tmp, tmpzval);
-					convert_to_long(&tmp);
-
-					if (Z_LVAL(tmp) < 0 || Z_LVAL(tmp) > 250) {
-						php_error_docref(NULL, E_WARNING, "Invalid parameter given for work factor. (%pd)", Z_LVAL(tmp));
+					zend_long work = zval_get_long(tmpzval);
+					if (work < 0 || work > 250) {
+						php_error_docref(NULL, E_WARNING, "Invalid parameter given for work factor. (" ZEND_LONG_FMT ")", work);
 					} else {
-						workFactor = (int)Z_LVAL(tmp);
+						workFactor = (int) work;
 					}
 				}
 			}
@@ -421,16 +397,7 @@ static php_stream_filter *php_bz2_filter_create(const char *filtername, zval *fi
 	return php_stream_filter_alloc(fops, data, persistent);
 }
 
-php_stream_filter_factory php_bz2_filter_factory = {
+const php_stream_filter_factory php_bz2_filter_factory = {
 	php_bz2_filter_create
 };
 /* }}} */
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: sw=4 ts=4 fdm=marker
- * vim<600: sw=4 ts=4
- */

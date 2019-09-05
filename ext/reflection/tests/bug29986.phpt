@@ -13,18 +13,18 @@ class just_constants
     const FLOAT_CONSTANT = 3.14159265;
 }
 
-Reflection::export(new ReflectionClass('just_constants'));
+echo new ReflectionClass('just_constants');
 ?>
 --EXPECTF--
 Class [ <user> class just_constants ] {
   @@ %s %d-%d
 
   - Constants [5] {
-    Constant [ boolean BOOLEAN_CONSTANT ] { 1 }
-    Constant [ null NULL_CONSTANT ] {  }
-    Constant [ string STRING_CONSTANT ] { This is a string }
-    Constant [ integer INTEGER_CONSTANT ] { 1000 }
-    Constant [ float FLOAT_CONSTANT ] { 3.14159265 }
+    Constant [ public bool BOOLEAN_CONSTANT ] { 1 }
+    Constant [ public null NULL_CONSTANT ] {  }
+    Constant [ public string STRING_CONSTANT ] { This is a string }
+    Constant [ public int INTEGER_CONSTANT ] { 1000 }
+    Constant [ public float FLOAT_CONSTANT ] { 3.14159265 }
   }
 
   - Static properties [0] {

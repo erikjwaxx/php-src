@@ -1,26 +1,24 @@
 --TEST--
-Test hash_file() function : basic functionality 
---SKIPIF--
-<?php extension_loaded('hash') or die('skip: hash extension not loaded.'); ?>
+Hash: hash_file() function : basic functionality
 --FILE--
 <?php
 
 /* Prototype  : string hash_file ( string algo, string filename [, bool raw_output] )
  * Description: Generate a hash value using the contents of a given file
  * Source code: ext/hash/hash.c
- * Alias to functions: 
+ * Alias to functions:
 */
 
 echo "*** Testing hash_file() : basic functionality ***\n";
 
-$file = dirname(__FILE__) . "hash_file.txt";
+$file = __DIR__ . "hash_file.txt";
 /* Creating a temporary file file */
 if (($fp = fopen( $file, "w+")) == FALSE) {
 	echo "Cannot create file ($file)";
     exit;
-}	
+}
 
-/* Writing into file */ 
+/* Writing into file */
 $content = "This is a sample string used to test the hash_file function with various hashing algorithms";
 if (is_writable($file)) {
   if (fwrite($fp, $content) === FALSE) {
@@ -29,7 +27,7 @@ if (is_writable($file)) {
   }
 }
 
-// close the file 
+// close the file
 fclose($fp);
 
 echo "adler32: " . hash_file('adler32', $file) . "\n";
@@ -59,12 +57,12 @@ unlink($file);
 
 ?>
 ===Done===
---EXPECTF--
+--EXPECT--
 *** Testing hash_file() : basic functionality ***
 adler32: ff87222e
 crc32: 61664d33
 gost: d9e65f0c0c2ef944e4f8a01f4a46365c4f33a2853756878182a7f03e1490a4cd
-haval128,3: 8bb81269aca8b7f87829020d76a4e841
+haval128,3: c25962b13383c3ed9f13817c8f2ae7d6
 md2: 70f791c0d8fa9edd7d08e32fcba8c354
 md4: a9d034b16bb290c57a645afd6f14cd3b
 md5: 704bf818448f5bbb94061332d2c889aa

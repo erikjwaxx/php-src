@@ -2,7 +2,7 @@
   +----------------------------------------------------------------------+
   | PHP Version 7                                                        |
   +----------------------------------------------------------------------+
-  | Copyright (c) 1997-2015 The PHP Group                                |
+  | Copyright (c) The PHP Group                                          |
   +----------------------------------------------------------------------+
   | This source file is subject to version 3.01 of the PHP license,      |
   | that is bundled with this package in the file LICENSE, and is        |
@@ -18,8 +18,6 @@
   +----------------------------------------------------------------------+
 */
 
-/* $Id$ */
-
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -34,7 +32,7 @@
 
 #ifdef PDO_USE_MYSQLND
 #	define pdo_mysql_stmt_execute_prepared(stmt) pdo_mysql_stmt_execute_prepared_mysqlnd(stmt)
-#	define pdo_free_bound_result(res) zval_dtor(res.zv)
+#	define pdo_free_bound_result(res) zval_ptr_dtor(res.zv)
 #	define pdo_mysql_stmt_close(stmt) mysqlnd_stmt_close(stmt, 0)
 #else
 #	define pdo_mysql_stmt_execute_prepared(stmt) pdo_mysql_stmt_execute_prepared_libmysql(stmt)
@@ -88,8 +86,9 @@ static int pdo_mysql_stmt_dtor(pdo_stmt_t *stmt) /* {{{ */
 	}
 #endif
 
-
-	if (S->H->server) {
+	if (!Z_ISUNDEF(stmt->database_object_handle)
+		&& IS_OBJ_VALID(EG(objects_store).object_buckets[Z_OBJ_HANDLE(stmt->database_object_handle)])
+		&& (!(OBJ_FLAGS(Z_OBJ(stmt->database_object_handle)) & IS_OBJ_FREE_CALLED))) {
 		while (mysql_more_results(S->H->server)) {
 			MYSQL_RES *res;
 			if (mysql_next_result(S->H->server) != 0) {
@@ -424,14 +423,14 @@ static int pdo_mysql_stmt_next_rowset(pdo_stmt_t *stmt) /* {{{ */
 		pdo_mysql_error_stmt(stmt);
 		PDO_DBG_RETURN(0);
 	} else {
-		PDO_DBG_RETURN(pdo_mysql_fill_stmt_from_result(stmt));
+		PDO_DBG_RETURN(pdo_mysql_fill_stmt_from_result(stmt) && stmt->row_count);
 	}
 #else
 	if (mysql_next_result(H->server) > 0) {
 		pdo_mysql_error_stmt(stmt);
 		PDO_DBG_RETURN(0);
 	} else {
-		PDO_DBG_RETURN(pdo_mysql_fill_stmt_from_result(stmt));
+		PDO_DBG_RETURN(pdo_mysql_fill_stmt_from_result(stmt) && stmt->row_count);
 	}
 #endif
 }
@@ -523,10 +522,12 @@ static int pdo_mysql_stmt_param_hook(pdo_stmt_t *stmt, struct pdo_bound_param_da
 							parameter = Z_REFVAL(param->parameter);
 						}
 						if (Z_TYPE_P(parameter) == IS_RESOURCE) {
-							php_stream *stm;
+							php_stream *stm = NULL;
 							php_stream_from_zval_no_verify(stm, parameter);
 							if (stm) {
-								ZVAL_STR(parameter, php_stream_copy_to_mem(stm, PHP_STREAM_COPY_ALL, 0));
+								zend_string *mem = php_stream_copy_to_mem(stm, PHP_STREAM_COPY_ALL, 0);
+								zval_ptr_dtor(parameter);
+								ZVAL_STR(parameter, mem ? mem : ZSTR_EMPTY_ALLOC());
 							} else {
 								pdo_raise_impl_error(stmt->dbh, stmt, "HY105", "Expected a stream resource");
 								return 0;
@@ -556,6 +557,10 @@ static int pdo_mysql_stmt_param_hook(pdo_stmt_t *stmt, struct pdo_bound_param_da
 #elif SIZEOF_ZEND_LONG==4
 						mysqlnd_stmt_bind_one_param(S->stmt, param->paramno, parameter, MYSQL_TYPE_LONG);
 #endif /* SIZEOF_LONG */
+						break;
+					case IS_TRUE:
+					case IS_FALSE:
+						mysqlnd_stmt_bind_one_param(S->stmt, param->paramno, parameter, MYSQL_TYPE_TINY);
 						break;
 					case IS_DOUBLE:
 						mysqlnd_stmt_bind_one_param(S->stmt, param->paramno, parameter, MYSQL_TYPE_DOUBLE);
@@ -696,14 +701,11 @@ static int pdo_mysql_stmt_describe(pdo_stmt_t *stmt, int colno) /* {{{ */
 		PDO_DBG_RETURN(1);
 	}
 	for (i = 0; i < stmt->column_count; i++) {
-		int namelen;
 
 		if (S->H->fetch_table_names) {
-			namelen = spprintf(&cols[i].name, 0, "%s.%s", S->fields[i].table, S->fields[i].name);
-			cols[i].namelen = namelen;
+			cols[i].name = strpprintf(0, "%s.%s", S->fields[i].table, S->fields[i].name);
 		} else {
-			cols[i].namelen = S->fields[i].name_length;
-			cols[i].name = estrndup(S->fields[i].name, S->fields[i].name_length);
+			cols[i].name = zend_string_init(S->fields[i].name, S->fields[i].name_length, 0);
 		}
 
 		cols[i].precision = S->fields[i].decimals;
@@ -876,7 +878,7 @@ static int pdo_mysql_stmt_col_meta(pdo_stmt_t *stmt, zend_long colno, zval *retu
 		case MYSQL_TYPE_SHORT:
 		case MYSQL_TYPE_INT24:
 		case MYSQL_TYPE_LONG:
-#if SIZEOF_LONG==8
+#if SIZEOF_ZEND_LONG==8
 		case MYSQL_TYPE_LONGLONG:
 #endif
 			add_assoc_long(return_value, "pdo_type", PDO_PARAM_INT);
@@ -923,7 +925,7 @@ static int pdo_mysql_stmt_cursor_closer(pdo_stmt_t *stmt) /* {{{ */
 }
 /* }}} */
 
-struct pdo_stmt_methods mysql_stmt_methods = {
+const struct pdo_stmt_methods mysql_stmt_methods = {
 	pdo_mysql_stmt_dtor,
 	pdo_mysql_stmt_execute,
 	pdo_mysql_stmt_fetch,
@@ -936,12 +938,3 @@ struct pdo_stmt_methods mysql_stmt_methods = {
 	pdo_mysql_stmt_next_rowset,
 	pdo_mysql_stmt_cursor_closer
 };
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: noet sw=4 ts=4 fdm=marker
- * vim<600: noet sw=4 ts=4
- */

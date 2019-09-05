@@ -17,7 +17,7 @@ class test2 {
 }
 
 class test3 {
-        public function __toString() {                
+        public function __toString() {
                 $GLOBALS['my_var'] .= "AAAAAAAA";
                 return '';
         }
@@ -41,6 +41,8 @@ array(1) {
   [0]=>
   string(0) ""
 }
+
+Warning: A non-numeric value encountered in %s on line %d
 array(1) {
   [0]=>
   string(40) "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"

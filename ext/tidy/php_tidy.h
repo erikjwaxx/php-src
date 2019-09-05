@@ -2,7 +2,7 @@
   +----------------------------------------------------------------------+
   | PHP Version 7                                                        |
   +----------------------------------------------------------------------+
-  | Copyright (c) 1997-2015 The PHP Group                                |
+  | Copyright (c) The PHP Group                                          |
   +----------------------------------------------------------------------+
   | This source file is subject to version 3.01 of the PHP license,      |
   | that is bundled with this package in the file LICENSE, and is        |
@@ -16,13 +16,14 @@
   +----------------------------------------------------------------------+
 */
 
-/* $Id$ */
-
 #ifndef PHP_TIDY_H
 #define PHP_TIDY_H
 
 extern zend_module_entry tidy_module_entry;
 #define phpext_tidy_ptr &tidy_module_entry
+
+#include "php_version.h"
+#define PHP_TIDY_VERSION PHP_VERSION
 
 #define TIDY_METHOD_MAP(name, func_name, arg_types) \
 	ZEND_NAMED_FE(name, ZEND_FN(func_name), arg_types)
@@ -39,22 +40,10 @@ ZEND_BEGIN_MODULE_GLOBALS(tidy)
 	zend_bool clean_output;
 ZEND_END_MODULE_GLOBALS(tidy)
 
-#ifdef ZTS
-#define TG(v) ZEND_TSRMG(tidy_globals_id, zend_tidy_globals *, v)
-#ifdef COMPILE_DL_TIDY
-ZEND_TSRMLS_CACHE_EXTERN();
-#endif
-#else
-#define TG(v) (tidy_globals.v)
+#define TG(v) ZEND_MODULE_GLOBALS_ACCESSOR(tidy, v)
+
+#if defined(ZTS) && defined(COMPILE_DL_TIDY)
+ZEND_TSRMLS_CACHE_EXTERN()
 #endif
 
 #endif
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: noet sw=4 ts=4 fdm=marker
- * vim<600: noet sw=4 ts=4
- */

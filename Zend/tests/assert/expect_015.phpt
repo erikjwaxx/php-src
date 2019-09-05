@@ -17,9 +17,10 @@ assert(0 && ($a = function () {
 	@foo();
 	$y = clone $x;
 	yield 1 => 2;
+	yield from $x;
 }));
 
-assert(0 && ($a = function &(array &$a, X $b = null) use ($c,&$d) : X {
+assert(0 && ($a = function &(array &$a, ?X $b = null) use ($c,&$d) : ?X {
 	abstract class A extends B implements C, D {
 		const X = 12;
 		const Y = self::X, Z = "aaa";
@@ -78,14 +79,16 @@ assert(0 && ($a = function &(array &$a, X $b = null) use ($c,&$d) : X {
 					return 9;
 				}
 L0:
-				switch ($x) {
-					case 4: break;
-					case 5: continue;
-					case 6: break 2;
-					case 7: continue 2;
-					case 8: goto L0;
-					default: return;
-				}
+                do {
+					switch ($x) {
+						case 4: break;
+						case 5: continue;
+						case 6: break 2;
+						case 7: continue 2;
+						case 8: goto L0;
+						default: return;
+					}
+				} while (0);
 			}
 		}
 	}
@@ -141,12 +144,6 @@ assert(0 && ($a = function () {
 
 ?>
 --EXPECTF--
-Warning: Unsupported declare 'A' in %sexpect_015.php on line %d
-
-Warning: Unsupported declare 'B' in %sexpect_015.php on line %d
-
-Warning: Unsupported declare 'C' in %sexpect_015.php on line %d
-
 Warning: assert(): assert(0 && ($a = function () {
     global $a;
     global $$b;
@@ -157,13 +154,14 @@ Warning: assert(): assert(0 && ($a = function () {
     $x = $a ? $b : $c;
     $x = $a ?: $c;
     $x = $a ?? $b;
-    list($a, $b, $c) = [1, 2 => 'x', 'z' => 'c'];
+    [$a, $b, $c] = [1, 2 => 'x', 'z' => 'c'];
     @foo();
     $y = clone $x;
     yield 1 => 2;
+    yield from $x;
 })) failed in %sexpect_015.php on line %d
 
-Warning: assert(): assert(0 && ($a = function &(array &$a, X $b = null) use($c, &$d): X {
+Warning: assert(): assert(0 && ($a = function &(array &$a, ?X $b = null) use($c, &$d): ?X {
     abstract class A extends B implements C, D {
         const X = 12;
         const Y = self::X, Z = 'aaa';
@@ -222,20 +220,22 @@ Warning: assert(): assert(0 && ($a = function &(array &$a, X $b = null) use($c, 
                     return 9;
                 }
                 L0:
-                switch ($x) {
-                    case 4:
-                        break;
-                    case 5:
-                        continue;
-                    case 6:
-                        break 2;
-                    case 7:
-                        continue 2;
-                    case 8:
-                        goto L0;
-                    default:
-                        return;
-                }
+                do {
+                    switch ($x) {
+                        case 4:
+                            break;
+                        case 5:
+                            continue;
+                        case 6:
+                            break 2;
+                        case 7:
+                            continue 2;
+                        case 8:
+                            goto L0;
+                        default:
+                            return;
+                    }
+                } while (0);
             }
         }
 

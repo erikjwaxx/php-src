@@ -2,8 +2,8 @@
 Testing stream_get_meta_data() on a process stream.
 --FILE--
 <?php
- 
-$output_file = __FILE__.'.tmp'; 
+
+$output_file = __FILE__.'.tmp';
 $cmd = "echo here is some output";
 $mode = 'rb';
 $handle = popen($cmd, $mode);
@@ -18,6 +18,12 @@ echo "Done";
 ?>
 --EXPECT--
 array(7) {
+  ["timed_out"]=>
+  bool(false)
+  ["blocked"]=>
+  bool(true)
+  ["eof"]=>
+  bool(false)
   ["stream_type"]=>
   string(5) "STDIO"
   ["mode"]=>
@@ -25,12 +31,6 @@ array(7) {
   ["unread_bytes"]=>
   int(0)
   ["seekable"]=>
-  bool(false)
-  ["timed_out"]=>
-  bool(false)
-  ["blocked"]=>
-  bool(true)
-  ["eof"]=>
   bool(false)
 }
 Done

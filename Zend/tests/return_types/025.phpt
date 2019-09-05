@@ -1,10 +1,11 @@
 --TEST--
-Return type of self is not allowed in closure
-
+Return type of self is allowed in closure
 --FILE--
 <?php
 
-$c = function(): self {};
-
---EXPECTF--
-Fatal error: Cannot declare a return type of self outside of a class scope in %s on line 3
+$c = function(): self { return $this; };
+class Bar { }
+var_dump($c->call(new Bar));
+--EXPECT--
+object(Bar)#2 (0) {
+}

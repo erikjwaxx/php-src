@@ -3,7 +3,7 @@ PL/SQL oci_bind_by_name with SQLT_AFC aka CHAR to VARCHAR2 parameter
 --SKIPIF--
 <?php
 if (!extension_loaded('oci8')) die ("skip no oci8 extension");
-require(dirname(__FILE__)."/connect.inc");
+require(__DIR__."/connect.inc");
 // The bind buffer size edge cases seem to change each DB version.
 preg_match('/.*Release ([[:digit:]]+)\.([[:digit:]]+)\.([[:digit:]]+)\.([[:digit:]]+)\.([[:digit:]]+)*/', oci_server_version($c), $matches);
 if (!(isset($matches[0]) && $matches[1] >= 12)) {
@@ -11,20 +11,20 @@ if (!(isset($matches[0]) && $matches[1] >= 12)) {
 }
 ?>
 --ENV--
-NLS_LANG=
+NLS_LANG=.AL32UTF8
 --FILE--
 <?php
 
 // Same test as bind_char_3 but the PL/SQL function uses VARCHAR2 instead of CHAR
 
-require(dirname(__FILE__).'/connect.inc');
+require(__DIR__.'/connect.inc');
 
 // Initialization
 
 $stmtarray = array(
 	"create or replace function bind_char_3_fn(p1 varchar2) return varchar2 as begin return p1; end;",
 );
-						 
+
 oci8_test_sql_execute($c, $stmtarray);
 
 // Run Test
@@ -245,11 +245,12 @@ oci8_test_sql_execute($c, $stmtarray);
 echo "Done\n";
 
 ?>
---EXPECTF--
+--EXPECT--
 Test 1.1 In Length: default.  In Type: default.  Out Length: default.          Out Type: default
   Executing:
+    Oci_execute error ORA-6502
 string(3) "abc"
-string(3) "abc"
+NULL
 Test 1.2 In Length: default.  In Type: default.  Out Length: 10.               Out Type: default
   Executing:
 string(3) "abc"
@@ -261,19 +262,20 @@ string(3) "abc"
 Test 1.4 In Length: -1.       In Type: AFC.      Out Length: 10.               Out Type: AFC
   Executing:
 string(3) "abc"
-string(30) "abc                           "
+string(10) "abc       "
 Test 1.5 In Length: strlen.   In Type: AFC.      Out Length: strlen(input).    Out Type: AFC
   Executing:
 string(3) "abc"
-string(9) "abc      "
+string(3) "abc"
 Test 1.6 In Length: strlen.   In Type: AFC.      Out Length: strlen(input)-1.  Out Type: AFC
   Executing:
+    Oci_execute error ORA-6502
 string(3) "abc"
-string(6) "abc   "
+string(3) "abc"
 Test 1.7 In Length: strlen.   In Type: AFC.      Out Length: strlen(input)+1.  Out Type: AFC
   Executing:
 string(3) "abc"
-string(12) "abc         "
+string(4) "abc "
 
 
 Tests with ''

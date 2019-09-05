@@ -11,7 +11,12 @@ pcntl_signal(SIGTERM, function($signo){
 posix_kill(posix_getpid(), SIGTERM);
 pcntl_signal_dispatch();
 
-var_dump(pcntl_signal());
+pcntl_signal(SIGUSR1, function($signo, $siginfo){
+	printf("got signal from %s\n", $siginfo['pid'] ?? 'nobody');
+});
+posix_kill(posix_getpid(), SIGUSR1);
+pcntl_signal_dispatch();
+
 var_dump(pcntl_signal(SIGALRM, SIG_IGN));
 var_dump(pcntl_signal(-1, -1));
 var_dump(pcntl_signal(-1, function(){}));
@@ -24,9 +29,7 @@ echo "ok\n";
 ?>
 --EXPECTF--
 signal dispatched
-
-Warning: pcntl_signal() expects at least 2 parameters, 0 given in %s
-NULL
+got signal from %r\d+|nobody%r
 bool(true)
 
 Warning: pcntl_signal(): Invalid signal %s

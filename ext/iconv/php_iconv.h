@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | PHP Version 7                                                        |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1997-2015 The PHP Group                                |
+   | Copyright (c) The PHP Group                                          |
    +----------------------------------------------------------------------+
    | This source file is subject to version 3.01 of the PHP license,      |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -16,8 +16,6 @@
    |          Stig Bakken <ssb@php.net>                                   |
    +----------------------------------------------------------------------+
  */
-
-/* $Id$ */
 
 #ifndef PHP_ICONV_H
 #define PHP_ICONV_H
@@ -33,6 +31,9 @@
 #else
 # define PHP_ICONV_API
 #endif
+
+#include "php_version.h"
+#define PHP_ICONV_VERSION PHP_VERSION
 
 #ifdef PHP_ATOM_INC
 #include "ext/iconv/php_have_iconv.h"
@@ -72,13 +73,10 @@ ZEND_BEGIN_MODULE_GLOBALS(iconv)
 	char *output_encoding;
 ZEND_END_MODULE_GLOBALS(iconv)
 
-#ifdef ZTS
-# define ICONVG(v) ZEND_TSRMG(iconv_globals_id, zend_iconv_globals *, v)
-# ifdef COMPILE_DL_ICONV
-ZEND_TSRMLS_CACHE_EXTERN();
-# endif
-#else
-# define ICONVG(v) (iconv_globals.v)
+#define ICONVG(v) ZEND_MODULE_GLOBALS_ACCESSOR(iconv, v)
+
+#if defined(ZTS) && defined(COMPILE_DL_ICONV)
+ZEND_TSRMLS_CACHE_EXTERN()
 #endif
 
 #ifdef HAVE_IBM_ICONV
@@ -118,10 +116,3 @@ PHP_ICONV_API php_iconv_err_t php_iconv_string(const char * in_p, size_t in_len,
 #define phpext_iconv_ptr iconv_module_ptr
 
 #endif	/* PHP_ICONV_H */
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- */

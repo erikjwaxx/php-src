@@ -20,16 +20,8 @@ $addGivenName = array(
 	)
 );
 
-// Too few parameters
-var_dump(ldap_modify_batch());
-var_dump(ldap_modify_batch($link));
-var_dump(ldap_modify_batch($link, "dc=my-domain,dc=com"));
-
-// Too many parameters
-var_dump(ldap_modify_batch($link, "dc=my-domain,dc=com", $addGivenName, "Invalid additional parameter"));
-
 // DN not found
-var_dump(ldap_modify_batch($link, "dc=my-domain,dc=com", $addGivenName));
+var_dump(ldap_modify_batch($link, "cn=not-found,$base", $addGivenName));
 
 // Invalid DN
 var_dump(ldap_modify_batch($link, "weirdAttribute=val", $addGivenName));
@@ -44,7 +36,7 @@ $entry = array(
 	"o"				=> "my-domain",
 );
 
-ldap_add($link, "dc=my-domain,dc=com", $entry);
+ldap_add($link, "dc=my-domain,$base", $entry);
 
 // invalid domain
 $mods = array(
@@ -55,7 +47,7 @@ $mods = array(
 	)
 );
 
-var_dump(ldap_modify_batch($link, "dc=my-domain,dc=com", $mods));
+var_dump(ldap_modify_batch($link, "dc=my-domain,$base", $mods));
 
 // invalid attribute
 $mods = array(
@@ -66,7 +58,7 @@ $mods = array(
 	)
 );
 
-var_dump(ldap_modify_batch($link, "dc=my-domain,dc=com", $mods));
+var_dump(ldap_modify_batch($link, "dc=my-domain,$base", $mods));
 ?>
 ===DONE===
 --CLEAN--
@@ -75,21 +67,9 @@ require "connect.inc";
 
 $link = ldap_connect_and_bind($host, $port, $user, $passwd, $protocol_version);
 
-ldap_delete($link, "dc=my-domain,dc=com");
+ldap_delete($link, "dc=my-domain,$base");
 ?>
 --EXPECTF--
-Warning: ldap_modify_batch() expects exactly 3 parameters, 0 given in %s on line %d
-NULL
-
-Warning: ldap_modify_batch() expects exactly 3 parameters, 1 given in %s on line %d
-NULL
-
-Warning: ldap_modify_batch() expects exactly 3 parameters, 2 given in %s on line %d
-NULL
-
-Warning: ldap_modify_batch() expects exactly 3 parameters, 4 given in %s on line %d
-NULL
-
 Warning: ldap_modify_batch(): Batch Modify: No such object in %s on line %d
 bool(false)
 

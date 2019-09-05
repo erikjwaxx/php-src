@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | PHP Version 7                                                        |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1997-2015 The PHP Group                                |
+   | Copyright (c) The PHP Group                                          |
    +----------------------------------------------------------------------+
    | This source file is subject to version 3.01 of the PHP license,      |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -17,8 +17,6 @@
    +----------------------------------------------------------------------+
  */
 
-/* $Id$ */
-
 /*#define DEBUG_MAIN_NETWORK 1*/
 
 #include "php.h"
@@ -30,11 +28,9 @@
 #ifdef PHP_WIN32
 # include <Ws2tcpip.h>
 # include "win32/inet.h"
+# include "win32/winutil.h"
 # define O_RDONLY _O_RDONLY
 # include "win32/param.h"
-#elif defined(NETWARE)
-#include <sys/timeval.h>
-#include <sys/param.h>
 #else
 #include <sys/param.h>
 #endif
@@ -51,21 +47,14 @@
 #ifdef HAVE_SYS_SELECT_H
 #include <sys/select.h>
 #endif
-#if HAVE_SYS_POLL_H
+#if HAVE_POLL_H
+#include <poll.h>
+#elif HAVE_SYS_POLL_H
 #include <sys/poll.h>
 #endif
 
-#if defined(NETWARE)
-#ifdef USE_WINSOCK
-#include <novsock2.h>
-#else
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <sys/select.h>
-#include <sys/socket.h>
-#endif
-#elif !defined(PHP_WIN32)
+
+#ifndef PHP_WIN32
 #include <netinet/in.h>
 #include <netdb.h>
 #if HAVE_ARPA_INET_H
@@ -79,7 +68,7 @@ int inet_aton(const char *, struct in_addr *);
 
 #include "php_network.h"
 
-#if defined(PHP_WIN32) || defined(__riscos__) || defined(NETWARE)
+#if defined(PHP_WIN32) || defined(__riscos__)
 #undef AF_UNIX
 #endif
 
@@ -213,7 +202,7 @@ PHPAPI int php_network_getaddresses(const char *host, int socktype, struct socka
 	if ((n = getaddrinfo(host, NULL, &hints, &res))) {
 		if (error_string) {
 			*error_string = strpprintf(0, "php_network_getaddresses: getaddrinfo failed: %s", PHP_GAI_STRERROR(n));
-			php_error_docref(NULL, E_WARNING, "%s", (*error_string)->val);
+			php_error_docref(NULL, E_WARNING, "%s", ZSTR_VAL(*error_string));
 		} else {
 			php_error_docref(NULL, E_WARNING, "php_network_getaddresses: getaddrinfo failed: %s", PHP_GAI_STRERROR(n));
 		}
@@ -221,7 +210,7 @@ PHPAPI int php_network_getaddresses(const char *host, int socktype, struct socka
 	} else if (res == NULL) {
 		if (error_string) {
 			*error_string = strpprintf(0, "php_network_getaddresses: getaddrinfo failed (null result pointer) errno=%d", errno);
-			php_error_docref(NULL, E_WARNING, "%s", (*error_string)->val);
+			php_error_docref(NULL, E_WARNING, "%s", ZSTR_VAL(*error_string));
 		} else {
 			php_error_docref(NULL, E_WARNING, "php_network_getaddresses: getaddrinfo failed (null result pointer)");
 		}
@@ -245,17 +234,16 @@ PHPAPI int php_network_getaddresses(const char *host, int socktype, struct socka
 	freeaddrinfo(res);
 #else
 	if (!inet_aton(host, &in)) {
-		/* XXX NOT THREAD SAFE (is safe under win32) */
 		if(strlen(host) > MAXFQDNLEN) {
 			host_info = NULL;
 			errno = E2BIG;
 		} else {
-			host_info = gethostbyname(host);
+			host_info = php_network_gethostbyname(host);
 		}
 		if (host_info == NULL) {
 			if (error_string) {
-				error_string = strpprintf(0, "php_network_getaddresses: gethostbyname failed. errno=%d", errno);
-				php_error_docref(NULL, E_WARNING, "%s", (*error_string)->val);
+				*error_string = strpprintf(0, "php_network_getaddresses: gethostbyname failed. errno=%d", errno);
+				php_error_docref(NULL, E_WARNING, "%s", ZSTR_VAL(*error_string));
 			} else {
 				php_error_docref(NULL, E_WARNING, "php_network_getaddresses: gethostbyname failed");
 			}
@@ -282,22 +270,19 @@ PHPAPI int php_network_getaddresses(const char *host, int socktype, struct socka
 #define O_NONBLOCK O_NDELAY
 #endif
 
-#if !defined(__BEOS__)
-# define HAVE_NON_BLOCKING_CONNECT 1
-# ifdef PHP_WIN32
+#ifdef PHP_WIN32
 typedef u_long php_non_blocking_flags_t;
 #  define SET_SOCKET_BLOCKING_MODE(sock, save) \
      save = TRUE; ioctlsocket(sock, FIONBIO, &save)
 #  define RESTORE_SOCKET_BLOCKING_MODE(sock, save) \
 	 ioctlsocket(sock, FIONBIO, &save)
-# else
+#else
 typedef int php_non_blocking_flags_t;
 #  define SET_SOCKET_BLOCKING_MODE(sock, save) \
 	 save = fcntl(sock, F_GETFL, 0); \
 	 fcntl(sock, F_SETFL, save | O_NONBLOCK)
 #  define RESTORE_SOCKET_BLOCKING_MODE(sock, save) \
 	 fcntl(sock, F_SETFL, save)
-# endif
 #endif
 
 /* Connect to a socket using an interruptible connect with optional timeout.
@@ -313,7 +298,6 @@ PHPAPI int php_network_connect_socket(php_socket_t sockfd,
 		zend_string **error_string,
 		int *error_code)
 {
-#if HAVE_NON_BLOCKING_CONNECT
 	php_non_blocking_flags_t orig_flags;
 	int n;
 	int error = 0;
@@ -391,12 +375,6 @@ ok:
 		}
 	}
 	return ret;
-#else
-	if (asynchronous) {
-		php_error_docref(NULL, E_WARNING, "Asynchronous connect() not supported on this platform");
-	}
-	return (connect(sockfd, addr, addrlen) == 0) ? 0 : -1;
-#endif
 }
 /* }}} */
 
@@ -472,6 +450,12 @@ php_socket_t php_network_bind_socket_to_local_addr(const char *host, unsigned po
 #ifdef SO_REUSEADDR
 			setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (char*)&sockoptval, sizeof(sockoptval));
 #endif
+#ifdef IPV6_V6ONLY
+			if (sockopts & STREAM_SOCKOP_IPV6_V6ONLY) {
+				int ipv6_val = !!(sockopts & STREAM_SOCKOP_IPV6_V6ONLY_ENABLED);
+				setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, (char*)&ipv6_val, sizeof(sockoptval));
+			}
+#endif
 #ifdef SO_REUSEPORT
 			if (sockopts & STREAM_SOCKOP_SO_REUSEPORT) {
 				setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, (char*)&sockoptval, sizeof(sockoptval));
@@ -480,6 +464,11 @@ php_socket_t php_network_bind_socket_to_local_addr(const char *host, unsigned po
 #ifdef SO_BROADCAST
 			if (sockopts & STREAM_SOCKOP_SO_BROADCAST) {
 				setsockopt(sock, SOL_SOCKET, SO_BROADCAST, (char*)&sockoptval, sizeof(sockoptval));
+			}
+#endif
+#ifdef TCP_NODELAY
+			if (sockopts & STREAM_SOCKOP_TCP_NODELAY) {
+				setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char*)&sockoptval, sizeof(sockoptval));
 			}
 #endif
 
@@ -526,6 +515,8 @@ PHPAPI int php_network_parse_network_address_with_port(const char *addr, zend_lo
 	struct sockaddr_in6 *in6 = (struct sockaddr_in6*)sa;
 #endif
 
+	memset(sa, 0, sizeof(struct sockaddr));
+
 	if (*addr == '[') {
 		colon = memchr(addr + 1, ']', addrlen-1);
 		if (!colon || colon[1] != ':') {
@@ -567,8 +558,8 @@ PHPAPI int php_network_parse_network_address_with_port(const char *addr, zend_lo
 
 	if (n == 0) {
 		if (errstr) {
-			php_error_docref(NULL, E_WARNING, "Failed to resolve `%s': %s", tmp, errstr->val);
-			zend_string_release(errstr);
+			php_error_docref(NULL, E_WARNING, "Failed to resolve `%s': %s", tmp, ZSTR_VAL(errstr));
+			zend_string_release_ex(errstr, 0);
 		}
 		goto out;
 	}
@@ -636,7 +627,7 @@ PHPAPI void php_network_populate_name_from_sockaddr(
 			case AF_INET6:
 				buf = (char*)inet_ntop(sa->sa_family, &((struct sockaddr_in6*)sa)->sin6_addr, (char *)&abuf, sizeof(abuf));
 				if (buf) {
-					*textaddr = strpprintf(0, "%s:%d",
+					*textaddr = strpprintf(0, "[%s]:%d",
 						buf, ntohs(((struct sockaddr_in6*)sa)->sin6_port));
 				}
 
@@ -649,7 +640,7 @@ PHPAPI void php_network_populate_name_from_sockaddr(
 
 					if (ua->sun_path[0] == '\0') {
 						/* abstract name */
-						int len = strlen(ua->sun_path + 1) + 1;
+						int len = sl - sizeof(sa_family_t);
 						*textaddr = zend_string_init((char*)ua->sun_path, len, 0);
 					} else {
 						int len = strlen(ua->sun_path);
@@ -721,7 +712,8 @@ PHPAPI php_socket_t php_network_accept_incoming(php_socket_t srvsock,
 		socklen_t *addrlen,
 		struct timeval *timeout,
 		zend_string **error_string,
-		int *error_code
+		int *error_code,
+		int tcp_nodelay
 		)
 {
 	php_socket_t clisock = -1;
@@ -745,6 +737,11 @@ PHPAPI php_socket_t php_network_accept_incoming(php_socket_t srvsock,
 					textaddr,
 					addr, addrlen
 					);
+			if (tcp_nodelay) {
+#ifdef TCP_NODELAY
+				setsockopt(clisock, IPPROTO_TCP, TCP_NODELAY, (char*)&tcp_nodelay, sizeof(tcp_nodelay));
+#endif
+			}
 		} else {
 			error = php_socket_errno();
 		}
@@ -760,7 +757,6 @@ PHPAPI php_socket_t php_network_accept_incoming(php_socket_t srvsock,
 	return clisock;
 }
 /* }}} */
-
 
 
 /* Connect to a remote host using an interruptible connect with optional timeout.
@@ -846,6 +842,9 @@ php_socket_t php_network_connect_socket_to_host(const char *host, unsigned short
 				int local_address_len = 0;
 
 				if (sa->sa_family == AF_INET) {
+					if (strchr(bindto,':')) {
+						goto skip_bind;
+					}
 					struct sockaddr_in *in4 = emalloc(sizeof(struct sockaddr_in));
 
 					local_address = (struct sockaddr*)in4;
@@ -885,7 +884,7 @@ skip_bind:
 			}
 			/* free error string received during previous iteration (if any) */
 			if (error_string && *error_string) {
-				zend_string_release(*error_string);
+				zend_string_release_ex(*error_string, 0);
 				*error_string = NULL;
 			}
 
@@ -894,6 +893,15 @@ skip_bind:
 				int val = 1;
 				if (sockopts & STREAM_SOCKOP_SO_BROADCAST) {
 					setsockopt(sock, SOL_SOCKET, SO_BROADCAST, (char*)&val, sizeof(val));
+				}
+			}
+#endif
+
+#ifdef TCP_NODELAY
+			{
+				int val = 1;
+				if (sockopts & STREAM_SOCKOP_TCP_NODELAY) {
+					setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char*)&val, sizeof(val));
 				}
 			}
 #endif
@@ -1015,20 +1023,8 @@ PHPAPI char *php_socket_strerror(long err, char *buf, size_t bufsize)
 	}
 	return buf;
 #else
-	char *sysbuf;
-	int free_it = 1;
-
-	if (!FormatMessage(
-				FORMAT_MESSAGE_ALLOCATE_BUFFER |
-				FORMAT_MESSAGE_FROM_SYSTEM |
-				FORMAT_MESSAGE_IGNORE_INSERTS,
-				NULL,
-				err,
-				MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-				(LPTSTR)&sysbuf,
-				0,
-				NULL)) {
-		free_it = 0;
+	char *sysbuf = php_win32_error_to_msg(err);
+	if (!sysbuf[0]) {
 		sysbuf = "Unknown Error";
 	}
 
@@ -1039,9 +1035,7 @@ PHPAPI char *php_socket_strerror(long err, char *buf, size_t bufsize)
 		buf[bufsize?(bufsize-1):0] = 0;
 	}
 
-	if (free_it) {
-		LocalFree(sysbuf);
-	}
+	php_win32_error_msg_free(sysbuf);
 
 	return buf;
 #endif
@@ -1058,28 +1052,15 @@ PHPAPI zend_string *php_socket_error_str(long err)
 	return zend_string_init(errstr, strlen(errstr), 0);
 #else
 	zend_string *ret;
-	char *sysbuf;
-	int free_it = 1;
 
-	if (!FormatMessage(
-				FORMAT_MESSAGE_ALLOCATE_BUFFER |
-				FORMAT_MESSAGE_FROM_SYSTEM |
-				FORMAT_MESSAGE_IGNORE_INSERTS,
-				NULL,
-				err,
-				MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-				(LPTSTR)&sysbuf,
-				0,
-				NULL)) {
-		free_it = 0;
+	char *sysbuf = php_win32_error_to_msg(err);
+	if (!sysbuf[0]) {
 		sysbuf = "Unknown Error";
 	}
 
 	ret = zend_string_init(sysbuf, strlen(sysbuf), 0);
 
-	if (free_it) {
-		LocalFree(sysbuf);
-	}
+	php_win32_error_msg_free(sysbuf);
 
 	return ret;
 #endif
@@ -1251,15 +1232,92 @@ PHPAPI int php_poll2(php_pollfd *ufds, unsigned int nfds, int timeout)
 	}
 	return n;
 }
-
 #endif
 
+#if defined(HAVE_GETHOSTBYNAME_R)
+#ifdef HAVE_FUNC_GETHOSTBYNAME_R_6
+struct hostent * gethostname_re (const char *host,struct hostent *hostbuf,char **tmphstbuf,size_t *hstbuflen)
+{
+	struct hostent *hp;
+	int herr,res;
 
-/*
- * Local variables:
- * tab-width: 8
- * c-basic-offset: 8
- * End:
- * vim600: sw=4 ts=4 fdm=marker
- * vim<600: sw=4 ts=4
- */
+	if (*hstbuflen == 0) {
+		*hstbuflen = 1024;
+		*tmphstbuf = (char *)malloc (*hstbuflen);
+	}
+
+	while (( res =
+		gethostbyname_r(host,hostbuf,*tmphstbuf,*hstbuflen,&hp,&herr))
+		&& (errno == ERANGE)) {
+		/* Enlarge the buffer. */
+		*hstbuflen *= 2;
+		*tmphstbuf = (char *)realloc (*tmphstbuf,*hstbuflen);
+	}
+
+	if (res != SUCCESS) {
+		return NULL;
+	}
+
+	return hp;
+}
+#endif
+#ifdef HAVE_FUNC_GETHOSTBYNAME_R_5
+struct hostent * gethostname_re (const char *host,struct hostent *hostbuf,char **tmphstbuf,size_t *hstbuflen)
+{
+	struct hostent *hp;
+	int herr;
+
+	if (*hstbuflen == 0) {
+		*hstbuflen = 1024;
+		*tmphstbuf = (char *)malloc (*hstbuflen);
+	}
+
+	while ((NULL == ( hp =
+		gethostbyname_r(host,hostbuf,*tmphstbuf,*hstbuflen,&herr)))
+		&& (errno == ERANGE)) {
+		/* Enlarge the buffer. */
+		*hstbuflen *= 2;
+		*tmphstbuf = (char *)realloc (*tmphstbuf,*hstbuflen);
+	}
+	return hp;
+}
+#endif
+#ifdef HAVE_FUNC_GETHOSTBYNAME_R_3
+struct hostent * gethostname_re (const char *host,struct hostent *hostbuf,char **tmphstbuf,size_t *hstbuflen)
+{
+	if (*hstbuflen == 0) {
+		*hstbuflen = sizeof(struct hostent_data);
+		*tmphstbuf = (char *)malloc (*hstbuflen);
+	} else {
+		if (*hstbuflen < sizeof(struct hostent_data)) {
+			*hstbuflen = sizeof(struct hostent_data);
+			*tmphstbuf = (char *)realloc(*tmphstbuf, *hstbuflen);
+		}
+	}
+	memset((void *)(*tmphstbuf),0,*hstbuflen);
+
+	if (SUCCESS != gethostbyname_r(host,hostbuf,(struct hostent_data *)*tmphstbuf)) {
+		return NULL;
+	}
+
+	return hostbuf;
+}
+#endif
+#endif
+
+PHPAPI struct hostent*	php_network_gethostbyname(char *name) {
+#if !defined(HAVE_GETHOSTBYNAME_R)
+	return gethostbyname(name);
+#else
+	if (FG(tmp_host_buf)) {
+		free(FG(tmp_host_buf));
+	}
+
+	FG(tmp_host_buf) = NULL;
+	FG(tmp_host_buf_len) = 0;
+
+	memset(&FG(tmp_host_info), 0, sizeof(struct hostent));
+
+	return gethostname_re(name, &FG(tmp_host_info), &FG(tmp_host_buf), &FG(tmp_host_buf_len));
+#endif
+}

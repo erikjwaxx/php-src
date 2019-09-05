@@ -3,8 +3,18 @@ Cannot access self::class when no class scope is active
 --FILE--
 <?php
 
-var_dump(self::class);
+try {
+    var_dump(self::class);
+} catch (Error $e) {
+    echo $e->getMessage(), "\n";
+}
+try {
+    var_dump([self::class]);
+} catch (Error $e) {
+    echo $e->getMessage(), "\n";
+}
 
 ?>
---EXPECTF--
-Fatal error: Cannot access self::class when no class scope is active in %s on line %d
+--EXPECT--
+Cannot use "self" when no class scope is active
+Cannot use "self" when no class scope is active

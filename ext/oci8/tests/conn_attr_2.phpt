@@ -1,9 +1,9 @@
 --TEST--
 Set and get of connection attributes across persistent connections and sysdba connection.
 --SKIPIF--
-<?php 
+<?php
 $target_dbs = array('oracledb' => true, 'timesten' => false);  // test runs on these DBs
-require(dirname(__FILE__).'/skipif.inc');
+require(__DIR__.'/skipif.inc');
 
 if (strcasecmp($user, "system") && strcasecmp($user, "sys")) die("skip needs to be run as a DBA user");
 if ($test_drcp) die("skip output might vary with DRCP");
@@ -16,13 +16,12 @@ if (!(isset($matches[0]) && $matches[1] >= 10)) {
 --INI--
 oci8.privileged_connect = On
 --FILE--
-
 <?php
 
 $testuser     = 'testuser_attr_2';  // Used in conn_attr.inc
-$testpassword = 'testuser'; 
+$testpassword = 'testuser';
 
-require(dirname(__FILE__)."/conn_attr.inc");
+require(__DIR__."/conn_attr.inc");
 
 $attr_array = array('MODULE','ACTION','CLIENT_INFO','CLIENT_IDENTIFIER');
 
@@ -71,7 +70,7 @@ if (!$sys_c1) {
 } else {
 	set_attr($sys_c1,'ACTION',10);
 	get_sys_attr($sys_c1,'ACTION');
-	get_attr($pc2,'ACTION');
+	get_attr($sys_c1,'ACTION');
 	oci_close($sys_c1);
 }
 

@@ -1,7 +1,5 @@
 --TEST--
 Bug #42819 (namespaces in indexes of constant arrays)
---SKIPIF--
-<?php if (!extension_loaded("spl")) print "skip SPL extension required"; ?>
 --FILE--
 <?php
 namespace foo\foo;
@@ -299,4 +297,8 @@ Array
     [1] => 1
 )
 
-Fatal error: Undefined constant 'foo\foo\unknown' in %sbug42819.php on line %d
+Fatal error: Uncaught Error: Undefined constant 'foo\foo\unknown' in %sbug42819.php:%d
+Stack trace:
+#0 %s(%d): foo\oops()
+#1 {main}
+  thrown in %sbug42819.php on line %d

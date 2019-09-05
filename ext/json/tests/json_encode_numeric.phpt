@@ -1,11 +1,9 @@
 --TEST--
 Test json_encode() function with numeric flag
+--INI--
+serialize_precision=-1
 --SKIPIF--
-<?php
-if (!extension_loaded("json")) {
-	die('skip JSON extension not available in this build');
-}	 
-?>
+<?php if (!extension_loaded("json")) print "skip"; ?>
 --FILE--
 <?php
 var_dump(

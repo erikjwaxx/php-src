@@ -4,11 +4,11 @@ SPL: Ensure access to non-visible properties falls back to dimension access with
 <?php
 class C extends ArrayObject {
 	private $x = 'secret';
-	
+
 	static function go($c) {
 	  var_dump($c->x);
 	}
-}	
+}
 
 $c = new C(array('x'=>'public'));
 
@@ -26,4 +26,7 @@ string(6) "secret"
 string(6) "public"
 string(6) "secret"
 
-Fatal error: Cannot access private property C::$x in %s on line 19
+Fatal error: Uncaught Error: Cannot access private property C::$x in %s:19
+Stack trace:
+#0 {main}
+  thrown in %s on line 19

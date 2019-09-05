@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | PHP Version 7                                                        |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1997-2015 The PHP Group                                |
+   | Copyright (c) The PHP Group                                          |
    +----------------------------------------------------------------------+
    | This source file is subject to version 3.01 of the PHP license,      |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -17,14 +17,15 @@
    +----------------------------------------------------------------------+
 */
 
-/* $Id$ */
-
 #ifndef PHP_LIBXML_H
 #define PHP_LIBXML_H
 
 #if HAVE_LIBXML
 extern zend_module_entry libxml_module_entry;
 #define libxml_module_ptr &libxml_module_entry
+
+#include "php_version.h"
+#define PHP_LIBXML_VERSION PHP_VERSION
 
 #ifdef PHP_WIN32
 #	define PHP_LIBXML_API __declspec(dllexport)
@@ -83,7 +84,7 @@ typedef struct _php_libxml_node_object {
 
 
 static inline php_libxml_node_object *php_libxml_node_fetch_object(zend_object *obj) {
-	return (php_libxml_node_object *)((char*)(obj) - XtOffsetOf(php_libxml_node_object, std));
+	return (php_libxml_node_object *)((char*)(obj) - obj->handlers->offset);
 }
 
 #define Z_LIBXML_NODE_P(zv) php_libxml_node_fetch_object(Z_OBJ_P((zv)))
@@ -97,6 +98,7 @@ PHP_LIBXML_API int php_libxml_decrement_doc_ref(php_libxml_node_object *object);
 PHP_LIBXML_API xmlNodePtr php_libxml_import_node(zval *object);
 PHP_LIBXML_API zval *php_libxml_register_export(zend_class_entry *ce, php_libxml_export_node export_function);
 /* When an explicit freeing of node and children is required */
+PHP_LIBXML_API void php_libxml_node_free_list(xmlNodePtr node);
 PHP_LIBXML_API void php_libxml_node_free_resource(xmlNodePtr node);
 /* When object dtor is called as node may still be referenced */
 PHP_LIBXML_API void php_libxml_node_decrement_resource(php_libxml_node_object *object);
@@ -112,13 +114,10 @@ PHP_LIBXML_API zend_bool php_libxml_disable_entity_loader(zend_bool disable);
 PHP_LIBXML_API void php_libxml_initialize(void);
 PHP_LIBXML_API void php_libxml_shutdown(void);
 
-#ifdef ZTS
-#define LIBXML(v) ZEND_TSRMG(libxml_globals_id, zend_libxml_globals *, v)
-#ifdef COMPILE_DL_LIBXML
-ZEND_TSRMLS_CACHE_EXTERN();
-#endif
-#else
-#define LIBXML(v) (libxml_globals.v)
+#define LIBXML(v) ZEND_MODULE_GLOBALS_ACCESSOR(libxml, v)
+
+#if defined(ZTS) && defined(COMPILE_DL_LIBXML)
+ZEND_TSRMLS_CACHE_EXTERN()
 #endif
 
 #else /* HAVE_LIBXML */
@@ -128,10 +127,3 @@ ZEND_TSRMLS_CACHE_EXTERN();
 #define phpext_libxml_ptr libxml_module_ptr
 
 #endif /* PHP_LIBXML_H */
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- */

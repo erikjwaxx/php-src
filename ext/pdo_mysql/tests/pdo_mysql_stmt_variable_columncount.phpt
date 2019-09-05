@@ -1,11 +1,9 @@
 --TEST--
 MySQL Prepared Statements and different column counts
---XFAIL--
-nextRowset() problem with stored proc & emulation mode & mysqlnd
 --SKIPIF--
 <?php
-require_once(dirname(__FILE__) . DIRECTORY_SEPARATOR . 'skipif.inc');
-require_once(dirname(__FILE__) . DIRECTORY_SEPARATOR . 'mysql_pdo_test.inc');
+require_once(__DIR__ . DIRECTORY_SEPARATOR . 'skipif.inc');
+require_once(__DIR__ . DIRECTORY_SEPARATOR . 'mysql_pdo_test.inc');
 MySQLPDOTest::skip();
 $db = MySQLPDOTest::factory();
 
@@ -21,7 +19,7 @@ if ($version < 50000)
 ?>
 --FILE--
 <?php
-	require_once(dirname(__FILE__) . DIRECTORY_SEPARATOR . 'mysql_pdo_test.inc');
+	require_once(__DIR__ . DIRECTORY_SEPARATOR . 'mysql_pdo_test.inc');
 	$db = MySQLPDOTest::factory();
 
 	function check_result($offset, $stmt, $columns) {
@@ -121,5 +119,5 @@ if ($version < 50000)
 
 	print "done!";
 ?>
---EXPECTF--
+--EXPECT--
 done!

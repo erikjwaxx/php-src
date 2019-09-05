@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | PHP Version 7                                                        |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1997-2015 The PHP Group                                |
+   | Copyright (c) The PHP Group                                          |
    +----------------------------------------------------------------------+
    | This source file is subject to version 3.01 of the PHP license,      |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -15,10 +15,6 @@
    | Author: Vlad Krupin <phpdevel@echospace.com>                         |
    +----------------------------------------------------------------------+
 */
-
-/* $Id$ */
-
-#define IS_EXT_MODULE
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -206,7 +202,7 @@ static int le_pspell, le_pspell_config;
 
 zend_module_entry pspell_module_entry = {
     STANDARD_MODULE_HEADER,
-	"pspell", pspell_functions, PHP_MINIT(pspell), NULL, NULL, NULL, PHP_MINFO(pspell), NO_VERSION_YET, STANDARD_MODULE_PROPERTIES
+	"pspell", pspell_functions, PHP_MINIT(pspell), NULL, NULL, NULL, PHP_MINFO(pspell), PHP_PSPELL_VERSION, STANDARD_MODULE_PROPERTIES
 };
 
 #ifdef COMPILE_DL_PSPELL
@@ -230,7 +226,7 @@ static void php_pspell_close_config(zend_resource *rsrc)
 #define PSPELL_FETCH_CONFIG  do { \
 	zval *res = zend_hash_index_find(&EG(regular_list), conf); \
 	if (res == NULL || Z_RES_P(res)->type != le_pspell_config) { \
-		php_error_docref(NULL, E_WARNING, "%ld is not a PSPELL config index", conf); \
+		php_error_docref(NULL, E_WARNING, ZEND_LONG_FMT " is not a PSPELL config index", conf); \
 		RETURN_FALSE; \
 	} \
 	config = (PspellConfig *)Z_RES_P(res)->ptr; \
@@ -239,7 +235,7 @@ static void php_pspell_close_config(zend_resource *rsrc)
 #define PSPELL_FETCH_MANAGER do { \
 	zval *res = zend_hash_index_find(&EG(regular_list), scin); \
 	if (res == NULL || Z_RES_P(res)->type != le_pspell) { \
-		php_error_docref(NULL, E_WARNING, "%ld is not a PSPELL result index", scin); \
+		php_error_docref(NULL, E_WARNING, ZEND_LONG_FMT " is not a PSPELL result index", scin); \
 		RETURN_FALSE; \
 	} \
 	manager = (PspellManager *)Z_RES_P(res)->ptr; \
@@ -768,7 +764,7 @@ static PHP_FUNCTION(pspell_config_runtogether)
 }
 /* }}} */
 
-/* {{{ proto bool pspell_config_mode(int conf, long mode)
+/* {{{ proto bool pspell_config_mode(int conf, int mode)
    Select mode for config (PSPELL_FAST, PSPELL_NORMAL or PSPELL_BAD_SPELLERS) */
 static PHP_FUNCTION(pspell_config_mode)
 {
@@ -808,7 +804,7 @@ static PHP_FUNCTION(pspell_config_ignore)
 
 	PSPELL_FETCH_CONFIG;
 
-	snprintf(ignore_str, sizeof(ignore_str), "%ld", ignore);
+	snprintf(ignore_str, sizeof(ignore_str), ZEND_LONG_FMT, ignore);
 
 	pspell_config_replace(config, "ignore", ignore_str);
 	RETURN_TRUE;
@@ -919,12 +915,3 @@ static PHP_MINFO_FUNCTION(pspell)
 /* }}} */
 
 #endif
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: sw=4 ts=4 fdm=marker
- * vim<600: sw=4 ts=4
- */

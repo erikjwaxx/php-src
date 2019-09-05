@@ -5,12 +5,10 @@ gmp_random_range() basic tests
 --FILE--
 <?php
 
-$minusTen = gmp_init(-1);
-$plusTen = gmp_init(1);
+$minusTen = gmp_init(-10);
+$plusTen = gmp_init(10);
 $zero = gmp_init(0);
 
-var_dump(gmp_random_range());
-var_dump(gmp_random_range(10));
 var_dump(gmp_random_range(10, -10));
 
 var_dump(gmp_random_range($plusTen, $minusTen));
@@ -30,7 +28,7 @@ gmp_random_range(-1, $plusTen);
 gmp_random_range($zero, $plusTen);
 gmp_random_range($minusTen, $plusTen);
 
-// 2 seconds to make sure the numbers stay in range
+// 0.5 seconds to make sure the numbers stay in range
 $start = microtime(true);
 while (1) {
 	for ($i = 0; $i < 5000; $i++) {
@@ -56,7 +54,7 @@ while (1) {
 		}
 	}
 
-	if (microtime(true) - $start > 2) {
+	if (microtime(true) - $start > 0.5) {
 		break;
 	}
 }
@@ -64,12 +62,6 @@ while (1) {
 echo "Done\n";
 ?>
 --EXPECTF--
-Warning: gmp_random_range() expects exactly 2 parameters, 0 given in %s on line %d
-NULL
-
-Warning: gmp_random_range() expects exactly 2 parameters, 1 given in %s on line %d
-NULL
-
 Warning: gmp_random_range(): The minimum value must be less than the maximum value in %s on line %d
 bool(false)
 

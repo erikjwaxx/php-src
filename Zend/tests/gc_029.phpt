@@ -1,7 +1,5 @@
 --TEST--
 GC 029: GC and destructors
---SKIPIF--
-<?php if (PHP_ZTS) { print "skip only for no-zts build"; }
 --INI--
 zend.enable_gc=1
 --FILE--
@@ -32,6 +30,8 @@ $bar->foo = $foo;
 unset($foo);
 unset($bar);
 var_dump(gc_collect_cycles());
+var_dump(gc_collect_cycles());
 ?>
---EXPECTREGEX--
-int\([23]\)
+--EXPECT--
+int(0)
+int(1)

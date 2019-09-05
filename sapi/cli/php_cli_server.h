@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | PHP Version 7                                                        |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1997-2015 The PHP Group                                |
+   | Copyright (c) The PHP Group                                          |
    +----------------------------------------------------------------------+
    | This source file is subject to version 3.01 of the PHP license,      |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -15,8 +15,6 @@
    | Author: Moriyoshi Koizumi <moriyoshi@php.net>                        |
    +----------------------------------------------------------------------+
 */
-
-/* $Id: php_cli.c 306938 2011-01-01 02:17:06Z felipe $ */
 
 #ifndef PHP_CLI_SERVER_H
 #define PHP_CLI_SERVER_H
@@ -33,18 +31,9 @@ ZEND_END_MODULE_GLOBALS(cli_server)
 
 #ifdef ZTS
 #define CLI_SERVER_G(v) ZEND_TSRMG(cli_server_globals_id, zend_cli_server_globals *, v)
-ZEND_TSRMLS_CACHE_EXTERN();
+ZEND_TSRMLS_CACHE_EXTERN()
 #else
 #define CLI_SERVER_G(v) (cli_server_globals.v)
 #endif
 
 #endif /* PHP_CLI_SERVER_H */
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: noet sw=4 ts=4 fdm=marker
- * vim<600: noet sw=4 ts=4
- */

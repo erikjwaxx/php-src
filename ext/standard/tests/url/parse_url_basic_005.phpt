@@ -1,17 +1,17 @@
 --TEST--
-Test parse_url() function: Parse a load of URLs without specifying PHP_URL_USER as the URL component 
+Test parse_url() function: Parse a load of URLs without specifying PHP_URL_USER as the URL component
 --FILE--
 <?php
 /* Prototype  : proto mixed parse_url(string url, [int url_component])
- * Description: Parse a URL and return its components 
+ * Description: Parse a URL and return its components
  * Source code: ext/standard/url.c
- * Alias to functions: 
+ * Alias to functions:
  */
 
 /*
  * Parse a load of URLs without specifying PHP_URL_USER as the URL component
  */
-include_once(dirname(__FILE__) . '/urls.inc');
+include_once(__DIR__ . '/urls.inc');
 
 foreach ($urls as $url) {
 	echo "--> $url   : ";
@@ -20,7 +20,7 @@ foreach ($urls as $url) {
 
 echo "Done";
 ?>
---EXPECTF--
+--EXPECT--
 --> 64.246.30.37   : NULL
 --> http://64.246.30.37   : NULL
 --> http://64.246.30.37/   : NULL
@@ -80,6 +80,7 @@ echo "Done";
 --> /foo.php?a=b&c=d   : NULL
 --> foo.php?a=b&c=d   : NULL
 --> http://user:passwd@www.example.com:8080?bar=1&boom=0   : string(4) "user"
+--> http://user_me-you:my_pas-word@www.example.com:8080?bar=1&boom=0   : string(11) "user_me-you"
 --> file:///path/to/file   : NULL
 --> file://path/to/file   : NULL
 --> file:/path/to/file   : NULL
@@ -97,8 +98,8 @@ echo "Done";
 --> http://::?   : NULL
 --> http://::#   : NULL
 --> x://::6.5   : NULL
---> http://?:/   : NULL
---> http://@?:/   : string(0) ""
+--> http://?:/   : bool(false)
+--> http://@?:/   : bool(false)
 --> file:///:   : NULL
 --> file:///a:/   : NULL
 --> file:///ab:/   : NULL

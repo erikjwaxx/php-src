@@ -8,6 +8,5 @@ function f() {
 var_dump(next(f()));
 ?>
 --EXPECTF--
-
-Strict Standards: Only variables should be passed by reference in %s on line %d
+Notice: Only variables should be passed by reference in %s on line %d
 int(2)

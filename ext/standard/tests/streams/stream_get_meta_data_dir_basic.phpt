@@ -3,16 +3,22 @@ stream_get_meta_data() on directories
 --FILE--
 <?php
 
-$dir = opendir(dirname(__FILE__));
+$dir = opendir(__DIR__);
 var_dump(stream_get_meta_data($dir));
 closedir($dir);
 
-$dirObject = dir(dirname(__FILE__));
+$dirObject = dir(__DIR__);
 var_dump(stream_get_meta_data($dirObject->handle));
 
 ?>
 --EXPECT--
 array(8) {
+  ["timed_out"]=>
+  bool(false)
+  ["blocked"]=>
+  bool(true)
+  ["eof"]=>
+  bool(false)
   ["wrapper_type"]=>
   string(9) "plainfile"
   ["stream_type"]=>
@@ -23,14 +29,14 @@ array(8) {
   int(0)
   ["seekable"]=>
   bool(true)
-  ["timed_out"]=>
-  bool(false)
-  ["blocked"]=>
-  bool(true)
-  ["eof"]=>
-  bool(false)
 }
 array(8) {
+  ["timed_out"]=>
+  bool(false)
+  ["blocked"]=>
+  bool(true)
+  ["eof"]=>
+  bool(false)
   ["wrapper_type"]=>
   string(9) "plainfile"
   ["stream_type"]=>
@@ -41,10 +47,4 @@ array(8) {
   int(0)
   ["seekable"]=>
   bool(true)
-  ["timed_out"]=>
-  bool(false)
-  ["blocked"]=>
-  bool(true)
-  ["eof"]=>
-  bool(false)
 }

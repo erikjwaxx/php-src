@@ -5,7 +5,7 @@ Calling method from array
 
 class Hello {
 	public function world($x) {
-		echo "Hello, $x\n"; return $this;
+		echo "Hello, $x\n";return $this;
 	}
 }
 
@@ -35,12 +35,6 @@ class Magic3 {
 		printf("%s called (%s)!\n", __METHOD__, $f);
 	}
 }
-
-$f = array('Hello','world');
-var_dump($f('you'));
-var_dump(call_user_func($f, 'you'));
-
-printf("-----\n");
 
 $h= new Hello;
 $f = array($h,'world');
@@ -99,37 +93,25 @@ var_dump(call_user_func($f, 'you'));
 
 ?>
 --EXPECTF--
-Strict Standards: Non-static method Hello::world() should not be called statically in %s on line %d
-Hello, you
-
-Notice: Undefined variable: this in %s on line %d
-NULL
-
-Strict Standards: %son-static method Hello::world() should not be called statically in %s on line %d
-Hello, you
-
-Notice: Undefined variable: this in %s on line %d
-NULL
------
 Hello, again
-object(Hello)#1 (0) {
+object(Hello)#%d (0) {
 }
 Hello, again
-object(Hello)#1 (0) {
+object(Hello)#%d (0) {
 }
 -----
 Hello, there
-object(Hello)#2 (0) {
+object(Hello)#%d (0) {
 }
 Hello, there
-object(Hello)#2 (0) {
+object(Hello)#%d (0) {
 }
 -----
 Hello, devs
-object(Hello)#4 (0) {
+object(Hello)#%d (0) {
 }
 Hello, devs
-object(Hello)#4 (0) {
+object(Hello)#%d (0) {
 }
 -----
 Magic::__call called (foo)!

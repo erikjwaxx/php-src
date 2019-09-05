@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | PHP Version 7                                                        |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1997-2015 The PHP Group                                |
+   | Copyright (c) The PHP Group                                          |
    +----------------------------------------------------------------------+
    | This source file is subject to version 3.01 of the PHP license,      |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -15,8 +15,6 @@
    | Author: Thies C. Arntzen <thies@thieso.net>                          |
    +----------------------------------------------------------------------+
  */
-
-/* $Id$ */
 
 /*
  * Functions to parse & compse IPTC data.
@@ -38,6 +36,15 @@
 
 #include <sys/stat.h>
 
+#ifdef PHP_WIN32
+# include "win32/php_stdint.h"
+#else
+# if HAVE_INTTYPES_H
+#  include <inttypes.h>
+# elif HAVE_STDINT_H
+#  include <stdint.h>
+# endif
+#endif
 
 /* some defines for the different JPEG block types */
 #define M_SOF0  0xC0            /* Start Of Frame N */
@@ -173,7 +180,7 @@ static int php_iptc_next_marker(FILE *fp, int spool, unsigned char **spoolbuf)
 
 static char psheader[] = "\xFF\xED\0\0Photoshop 3.0\08BIM\x04\x04\0\0\0\0";
 
-/* {{{ proto array iptcembed(string iptcdata, string jpeg_file_name [, int spool])
+/* {{{ proto string|false iptcembed(string iptcdata, string jpeg_file_name [, int spool])
    Embed binary IPTC data into a JPEG image. */
 PHP_FUNCTION(iptcembed)
 {
@@ -182,16 +189,25 @@ PHP_FUNCTION(iptcembed)
 	zend_long spool = 0;
 	FILE *fp;
 	unsigned int marker, done = 0;
-	int inx;
-	unsigned char *spoolbuf = NULL, *poi = NULL;
+	size_t inx;
+	zend_string *spoolbuf = NULL;
+	unsigned char *poi = NULL;
 	zend_stat_t sb;
 	zend_bool written = 0;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS(), "sp|l", &iptcdata, &iptcdata_len, &jpeg_file, &jpeg_file_len, &spool) != SUCCESS) {
-		return;
-	}
+	ZEND_PARSE_PARAMETERS_START(2, 3)
+		Z_PARAM_STRING(iptcdata, iptcdata_len)
+		Z_PARAM_PATH(jpeg_file, jpeg_file_len)
+		Z_PARAM_OPTIONAL
+		Z_PARAM_LONG(spool)
+	ZEND_PARSE_PARAMETERS_END();
 
 	if (php_check_open_basedir(jpeg_file)) {
+		RETURN_FALSE;
+	}
+
+	if (iptcdata_len >= SIZE_MAX - sizeof(psheader) - 1025) {
+		php_error_docref(NULL, E_WARNING, "IPTC data too large");
 		RETURN_FALSE;
 	}
 
@@ -203,14 +219,15 @@ PHP_FUNCTION(iptcembed)
 	if (spool < 2) {
 		zend_fstat(fileno(fp), &sb);
 
-		poi = spoolbuf = safe_emalloc(1, iptcdata_len + sizeof(psheader) + sb.st_size + 1024, 1);
+		spoolbuf = zend_string_safe_alloc(1, iptcdata_len + sizeof(psheader) + 1024 + 1, sb.st_size, 0);
+		poi = (unsigned char*)ZSTR_VAL(spoolbuf);
 		memset(poi, 0, iptcdata_len + sizeof(psheader) + sb.st_size + 1024 + 1);
 	}
 
 	if (php_iptc_get1(fp, spool, poi?&poi:0) != 0xFF) {
 		fclose(fp);
 		if (spoolbuf) {
-			efree(spoolbuf);
+			zend_string_efree(spoolbuf);
 		}
 		RETURN_FALSE;
 	}
@@ -218,7 +235,7 @@ PHP_FUNCTION(iptcembed)
 	if (php_iptc_get1(fp, spool, poi?&poi:0) != 0xD8) {
 		fclose(fp);
 		if (spoolbuf) {
-			efree(spoolbuf);
+			zend_string_efree(spoolbuf);
 		}
 		RETURN_FALSE;
 	}
@@ -236,6 +253,7 @@ PHP_FUNCTION(iptcembed)
 			case M_APP13:
 				/* we are going to write a new APP13 marker, so don't output the old one */
 				php_iptc_skip_variable(fp, 0, 0);
+				fgetc(fp); /* skip already copied 0xFF byte */
 				php_iptc_read_remaining(fp, spool, poi?&poi:0);
 				done = 1;
 				break;
@@ -255,7 +273,7 @@ PHP_FUNCTION(iptcembed)
 					iptcdata_len++; /* make the length even */
 				}
 
-				psheader[ 2 ] = (iptcdata_len+28)>>8;
+				psheader[ 2 ] = (char) ((iptcdata_len+28)>>8);
 				psheader[ 3 ] = (iptcdata_len+28)&0xff;
 
 				for (inx = 0; inx < 28; inx++) {
@@ -285,29 +303,28 @@ PHP_FUNCTION(iptcembed)
 	fclose(fp);
 
 	if (spool < 2) {
-		// TODO: avoid reallocation ???
-		RETVAL_STRINGL((char *) spoolbuf, poi - spoolbuf);
-		efree(spoolbuf);
+		spoolbuf = zend_string_truncate(spoolbuf, poi - (unsigned char*)ZSTR_VAL(spoolbuf), 0);
+		RETURN_NEW_STR(spoolbuf);
 	} else {
 		RETURN_TRUE;
 	}
 }
 /* }}} */
 
-/* {{{ proto array iptcparse(string iptcdata)
+/* {{{ proto array|false iptcparse(string iptcdata)
    Parse binary IPTC-data into associative array */
 PHP_FUNCTION(iptcparse)
 {
-	int inx = 0, len;
+	size_t inx = 0, len;
 	unsigned int tagsfound = 0;
 	unsigned char *buffer, recnum, dataset;
 	char *str, key[16];
 	size_t str_len;
 	zval values, *element;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS(), "s", &str, &str_len) != SUCCESS) {
-		return;
-	}
+	ZEND_PARSE_PARAMETERS_START(1, 1)
+		Z_PARAM_STRING(str, str_len)
+	ZEND_PARSE_PARAMETERS_END();
 
 	buffer = (unsigned char *)str;
 
@@ -342,7 +359,7 @@ PHP_FUNCTION(iptcparse)
 			inx += 2;
 		}
 
-		if ((len < 0) || (len > str_len) || (inx + len) > str_len) {
+		if ((len > str_len) || (inx + len) > str_len) {
 			break;
 		}
 
@@ -368,12 +385,3 @@ PHP_FUNCTION(iptcparse)
 	}
 }
 /* }}} */
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: sw=4 ts=4 fdm=marker
- * vim<600: sw=4 ts=4
- */

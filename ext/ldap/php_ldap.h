@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | PHP Version 7                                                        |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1997-2015 The PHP Group                                |
+   | Copyright (c) The PHP Group                                          |
    +----------------------------------------------------------------------+
    | This source file is subject to version 3.01 of the PHP license,      |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -18,8 +18,6 @@
    +----------------------------------------------------------------------+
 */
 
-/* $Id$ */
-
 #ifndef PHP_LDAP_H
 #define PHP_LDAP_H
 
@@ -32,6 +30,9 @@
 extern zend_module_entry ldap_module_entry;
 #define ldap_module_ptr &ldap_module_entry
 
+#include "php_version.h"
+#define PHP_LDAP_VERSION PHP_VERSION
+
 /* LDAP functions */
 PHP_MINIT_FUNCTION(ldap);
 PHP_MSHUTDOWN_FUNCTION(ldap);
@@ -42,11 +43,12 @@ ZEND_BEGIN_MODULE_GLOBALS(ldap)
 	zend_long max_links;
 ZEND_END_MODULE_GLOBALS(ldap)
 
-#ifdef ZTS
-# define LDAPG(v) TSRMG(ldap_globals_id, zend_ldap_globals *, v)
-#else
-# define LDAPG(v) (ldap_globals.v)
+#if defined(ZTS) && defined(COMPILE_DL_LDAP)
+ZEND_TSRMLS_CACHE_EXTERN()
 #endif
+
+ZEND_EXTERN_MODULE_GLOBALS(ldap)
+#define LDAPG(v) ZEND_MODULE_GLOBALS_ACCESSOR(ldap, v)
 
 #define phpext_ldap_ptr ldap_module_ptr
 

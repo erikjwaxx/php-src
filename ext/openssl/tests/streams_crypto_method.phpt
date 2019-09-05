@@ -4,6 +4,7 @@ Specific crypto method for ssl:// transports.
 <?php
 if (!extension_loaded("openssl")) die("skip openssl not loaded");
 if (!function_exists("proc_open")) die("skip no proc_open");
+?>
 --FILE--
 <?php
 $serverCode = <<<'CODE'
@@ -37,7 +38,7 @@ $clientCode = <<<'CODE'
     $serverUri = "https://127.0.0.1:64321/";
     $clientFlags = STREAM_CLIENT_CONNECT;
     $clientCtx = stream_context_create(['ssl' => [
-        'crypto_method' => STREAM_CRYPTO_METHOD_SSLv3_CLIENT,
+        'crypto_method' => STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT,
         'verify_peer' => false,
         'verify_peer_name' => false
     ]]);
@@ -48,5 +49,6 @@ CODE;
 
 include 'ServerClientTestCase.inc';
 ServerClientTestCase::getInstance()->run($clientCode, $serverCode);
---EXPECTF--
+?>
+--EXPECT--
 Hello World!

@@ -16,14 +16,11 @@ class Works extends Base
 
 class Extended extends Base
 {
-	public function Extended()
+	public function __construct()
 	{
 	}
 }
 
-ReflectionClass::export('Extended');
-
 ?>
 --EXPECTF--
-
-Fatal error: Cannot override final Base::__construct() with Extended::Extended() in %sfinal_ctor1.php on line %d
+Fatal error: Cannot override final method Base::__construct() in %s on line %d

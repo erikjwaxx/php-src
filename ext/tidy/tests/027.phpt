@@ -10,8 +10,8 @@ Bug: tidy segfaults with markup=false
 abstract class BaseClass {
         private static $tidyconfig;
 
-        public function BaseClass() {
-                $this->tidyconfig = array(
+        public function __construct() {
+                self::$tidyconfig = array(
                         'indent'                        => false,
                         'clean'                         => true,
                         'merge-divs'            => false,
@@ -29,7 +29,7 @@ abstract class BaseClass {
                 $data = "awerawer"; // in my code, $data is downloaded from a site
 
                 $tidy = new tidy;
-                $tidy->parseString($data, $this->tidyconfig, 'utf8');
+                $tidy->parseString($data, self::$tidyconfig, 'utf8');
                 $tidy->cleanRepair();
 
                 return $tidy;
@@ -38,7 +38,7 @@ abstract class BaseClass {
 }
 
 class ChildClass extends BaseClass {
-        public function ChildClass() {
+        public function __construct() {
                 parent::__construct();
         }
 

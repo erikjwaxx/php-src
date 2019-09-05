@@ -17,7 +17,7 @@ unset($unset_var);
 class sample  {
   public function __toString() {
     return "sample object";
-  } 
+  }
 }
 
 //getting the resource
@@ -31,36 +31,36 @@ $inputs =  array (
 		  1,
 		  -2,
 		  -PHP_INT_MAX,
-		
+
 		  // float values
 /*5*/	  10.5,
 		  -20.5,
 		  10.1234567e10,
-		
+
 		  // array values
 /*8*/	  array(),
 		  array(0),
 		  array(1, 2),
-		
+
 		  // boolean values
 /*11*/	  true,
 		  false,
 		  TRUE,
 		  FALSE,
-		
-		  // null vlaues
+
+		  // null values
 /*15*/	  NULL,
 		  null,
-		
+
 		  // objects
 /*17*/	  new sample(),
-		
+
 		  // resource
 /*18*/	  $file_handle,
-		
+
 		  // undefined variable
 /*19*/	  @$undefined_var,
-		
+
 		  // unset variable
 /*20*/	  @$unset_var
 );
@@ -72,7 +72,11 @@ $pad_length = "20";
 $count = 1;
 foreach($inputs as $input) {
   echo "-- Iteration $count --\n";
-  var_dump( stristr("Hello World", $input) );
+  try {
+    var_dump( stristr("Hello World", $input) );
+  } catch (TypeError $e) {
+    echo $e->getMessage(), "\n";
+  }
   $count ++;
 }
 
@@ -80,7 +84,7 @@ fclose($file_handle);  //closing the file handle
 
 ?>
 ===DONE===
---EXPECTF--
+--EXPECT--
 *** Testing stristr() function: with unexpected inputs for 'needle' argument ***
 -- Iteration 1 --
 bool(false)
@@ -97,39 +101,29 @@ bool(false)
 -- Iteration 7 --
 bool(false)
 -- Iteration 8 --
-
-Warning: stristr(): needle is not a string or an integer in %s on line %d
-bool(false)
+stristr() expects parameter 2 to be string, array given
 -- Iteration 9 --
-
-Warning: stristr(): needle is not a string or an integer in %s on line %d
-bool(false)
+stristr() expects parameter 2 to be string, array given
 -- Iteration 10 --
-
-Warning: stristr(): needle is not a string or an integer in %s on line %d
-bool(false)
+stristr() expects parameter 2 to be string, array given
 -- Iteration 11 --
 bool(false)
 -- Iteration 12 --
-bool(false)
+string(11) "Hello World"
 -- Iteration 13 --
 bool(false)
 -- Iteration 14 --
-bool(false)
+string(11) "Hello World"
 -- Iteration 15 --
-bool(false)
+string(11) "Hello World"
 -- Iteration 16 --
-bool(false)
+string(11) "Hello World"
 -- Iteration 17 --
-
-Notice: Object of class sample could not be converted to int in %s on line %d
 bool(false)
 -- Iteration 18 --
-
-Warning: stristr(): needle is not a string or an integer in %s on line %d
-bool(false)
+stristr() expects parameter 2 to be string, resource given
 -- Iteration 19 --
-bool(false)
+string(11) "Hello World"
 -- Iteration 20 --
-bool(false)
+string(11) "Hello World"
 ===DONE===

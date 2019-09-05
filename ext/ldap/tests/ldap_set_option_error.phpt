@@ -20,17 +20,8 @@ $controls = array(
 		array("oid" => "1.2.752.58.1.10", "value" => "magic"),
 		"weird"
 	),
-	array(
-	),
+	"notanarray"
 );
-
-// Too few parameters
-var_dump(ldap_set_option());
-var_dump(ldap_set_option($link));
-var_dump(ldap_set_option($link, LDAP_OPT_PROTOCOL_VERSION));
-
-// Too many parameters
-var_dump(ldap_set_option($link, LDAP_OPT_PROTOCOL_VERSION, 3, "Additional data"));
 
 var_dump(ldap_set_option($link, LDAP_OPT_PROTOCOL_VERSION, 10));
 
@@ -41,17 +32,6 @@ var_dump(ldap_set_option($link, 999999, 999999));
 ?>
 ===DONE===
 --EXPECTF--
-Warning: ldap_set_option() expects exactly 3 parameters, 0 given in %s on line %d
-NULL
-
-Warning: ldap_set_option() expects exactly 3 parameters, 1 given in %s on line %d
-NULL
-
-Warning: ldap_set_option() expects exactly 3 parameters, 2 given in %s on line %d
-NULL
-
-Warning: ldap_set_option() expects exactly 3 parameters, 4 given in %s on line %d
-NULL
 bool(false)
 
 Warning: ldap_set_option(): Control must have an oid key in %s on line %d
@@ -60,7 +40,7 @@ bool(false)
 Warning: ldap_set_option(): The array value must contain only arrays, where each array is a control in %s on line %d
 bool(false)
 
-Warning: ldap_set_option(): Expected non-empty array value for this option in %s on line %d
+Warning: ldap_set_option(): Expected array value for this option in %s on line %d
 bool(false)
 bool(false)
 ===DONE===

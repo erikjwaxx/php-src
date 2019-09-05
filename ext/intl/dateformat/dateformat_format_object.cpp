@@ -33,6 +33,12 @@ extern "C" {
 #include "../common/common_date.h"
 }
 
+using icu::Locale;
+using icu::DateFormat;
+using icu::GregorianCalendar;
+using icu::StringPiece;
+using icu::SimpleDateFormat;
+
 static const DateFormat::EStyle valid_styles[] = {
 		DateFormat::kNone,
 		DateFormat::kFull,
@@ -136,7 +142,9 @@ U_CFUNC PHP_FUNCTION(datefmt_format_object)
 		}
 		dateStyle = timeStyle = (DateFormat::EStyle)Z_LVAL_P(format);
 	} else {
-		convert_to_string_ex(format);
+		if (!try_convert_to_string(format)) {
+			return;
+		}
 		if (Z_STRLEN_P(format) == 0) {
 			intl_error_set(NULL, U_ILLEGAL_ARGUMENT_ERROR,
 					"datefmt_format_object: the format is empty", 0);
@@ -146,7 +154,9 @@ U_CFUNC PHP_FUNCTION(datefmt_format_object)
 	}
 
 	//there's no support for relative time in ICU yet
-	timeStyle = (DateFormat::EStyle)(timeStyle & ~DateFormat::kRelative);
+	if (timeStyle != DateFormat::NONE) {
+		timeStyle = (DateFormat::EStyle)(timeStyle & ~DateFormat::kRelative);
+	}
 
 	zend_class_entry *instance_ce = Z_OBJCE_P(object);
 	if (instanceof_function(instance_ce, Calendar_ce_ptr)) {
@@ -167,7 +177,7 @@ U_CFUNC PHP_FUNCTION(datefmt_format_object)
 			goto cleanup;
 		}
 		cal = obj_cal->clone();
-	} else if (instanceof_function(instance_ce, php_date_get_date_ce())) {
+	} else if (instanceof_function(instance_ce, php_date_get_interface_ce())) {
 		if (intl_datetime_decompose(object, &date, &timeZone, NULL,
 				"datefmt_format_object") == FAILURE) {
 			RETURN_FALSE;
@@ -188,11 +198,11 @@ U_CFUNC PHP_FUNCTION(datefmt_format_object)
 	}
 
 	if (pattern) {
-		 df = new SimpleDateFormat(
-				UnicodeString(Z_STRVAL_P(format), Z_STRLEN_P(format),
-						UnicodeString::kInvariant),
-				Locale::createFromName(locale_str),
-				status);
+		StringPiece sp(Z_STRVAL_P(format));
+		df = new SimpleDateFormat(
+			UnicodeString::fromUTF8(sp),
+			Locale::createFromName(locale_str),
+			status);
 
 		if (U_FAILURE(status)) {
 			intl_error_set(NULL, status,
@@ -221,21 +231,19 @@ U_CFUNC PHP_FUNCTION(datefmt_format_object)
 	timeZone = NULL;
 
 	{
-		char *ret_str;
-		size_t ret_str_len;
+		zend_string *u8str;
 		UnicodeString result = UnicodeString();
 		df->format(date, result);
 
-		if (intl_charFromString(result, &ret_str, &ret_str_len, &status) == FAILURE) {
+		u8str = intl_charFromString(result, &status);
+		if (!u8str) {
 			intl_error_set(NULL, status,
 					"datefmt_format_object: error converting result to UTF-8",
 					0);
 			RETVAL_FALSE;
 			goto cleanup;
 		}
-		RETVAL_STRINGL(ret_str, ret_str_len);
-		//???
-		efree(ret_str);
+		RETVAL_STR(u8str);
 	}
 
 

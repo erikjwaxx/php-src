@@ -2,7 +2,7 @@
   +----------------------------------------------------------------------+
   | PHP Version 7                                                        |
   +----------------------------------------------------------------------+
-  | Copyright (c) 1997-2015 The PHP Group                                |
+  | Copyright (c) The PHP Group                                          |
   +----------------------------------------------------------------------+
   | This source file is subject to version 3.01 of the PHP license,      |
   | that is bundled with this package in the file LICENSE, and is        |
@@ -16,8 +16,6 @@
   |          Andrey Hristov <andrey@php.net>                             |
   |          Ulf Wendel <uw@php.net>                                     |
   +----------------------------------------------------------------------+
-
-  $Id$
 */
 
 #ifndef PHP_MYSQLI_STRUCTS_H
@@ -54,10 +52,6 @@
 #ifdef HAVE_MBSTATE_T
 #undef HAVE_MBSTATE_T
 #define WE_HAD_MBSTATE_T
-#endif
-
-#if defined(ulong) && !defined(HAVE_ULONG)
-#define HAVE_ULONG
 #endif
 
 #include <my_global.h>
@@ -211,14 +205,10 @@ extern void php_mysqli_dtor_p_elements(void *data);
 
 extern void php_mysqli_close(MY_MYSQL * mysql, int close_type, int resource_status);
 
-extern zend_object_iterator_funcs php_mysqli_result_iterator_funcs;
+extern const zend_object_iterator_funcs php_mysqli_result_iterator_funcs;
 extern zend_object_iterator *php_mysqli_result_get_iterator(zend_class_entry *ce, zval *object, int by_ref);
 
 extern void php_mysqli_fetch_into_hash_aux(zval *return_value, MYSQL_RES * result, zend_long fetchtype);
-
-#ifdef HAVE_SPL
-extern PHPAPI zend_class_entry *spl_ce_RuntimeException;
-#endif
 
 #define MYSQLI_DISABLE_MQ if (mysql->multi_query) { \
 	mysql_set_server_option(mysql->mysql, MYSQL_OPTION_MULTI_STATEMENTS_OFF); \
@@ -259,13 +249,13 @@ extern PHPAPI zend_class_entry *spl_ce_RuntimeException;
 	MYSQLI_RESOURCE *my_res; \
 	mysqli_object *intern = Z_MYSQLI_P(__id); \
 	if (!(my_res = (MYSQLI_RESOURCE *)intern->ptr)) {\
-  		php_error_docref(NULL, E_WARNING, "Couldn't fetch %s", intern->zo.ce->name->val);\
-  		RETURN_NULL();\
+  		php_error_docref(NULL, E_WARNING, "Couldn't fetch %s", ZSTR_VAL(intern->zo.ce->name));\
+		RETURN_FALSE;\
   	}\
 	__ptr = (__type)my_res->ptr; \
 	if (__check && my_res->status < __check) { \
-		php_error_docref(NULL, E_WARNING, "invalid object or resource %s\n", intern->zo.ce->name->val); \
-		RETURN_NULL();\
+		php_error_docref(NULL, E_WARNING, "invalid object or resource %s\n", ZSTR_VAL(intern->zo.ce->name)); \
+		RETURN_FALSE;\
 	}\
 }
 
@@ -273,12 +263,12 @@ extern PHPAPI zend_class_entry *spl_ce_RuntimeException;
 { \
 	MYSQLI_RESOURCE *my_res; \
 	if (!(my_res = (MYSQLI_RESOURCE *)(__obj->ptr))) {\
-  		php_error_docref(NULL, E_WARNING, "Couldn't fetch %s", intern->zo.ce->name->val);\
+  		php_error_docref(NULL, E_WARNING, "Couldn't fetch %s", ZSTR_VAL(intern->zo.ce->name));\
   		return;\
   	}\
 	__ptr = (__type)my_res->ptr; \
 	if (__check && my_res->status < __check) { \
-		php_error_docref(NULL, E_WARNING, "invalid object or resource %s\n", intern->zo.ce->name->val); \
+		php_error_docref(NULL, E_WARNING, "invalid object or resource %s\n", ZSTR_VAL(intern->zo.ce->name)); \
 		return;\
 	}\
 }
@@ -288,7 +278,7 @@ extern PHPAPI zend_class_entry *spl_ce_RuntimeException;
 	MYSQLI_FETCH_RESOURCE((__ptr), MY_MYSQL *, (__id), "mysqli_link", (__check)); \
 	if (!(__ptr)->mysql) { \
 		mysqli_object *intern = Z_MYSQLI_P(__id); \
-		php_error_docref(NULL, E_WARNING, "invalid object or resource %s\n", intern->zo.ce->name->val); \
+		php_error_docref(NULL, E_WARNING, "invalid object or resource %s\n", ZSTR_VAL(intern->zo.ce->name)); \
 		RETURN_NULL(); \
 	} \
 }
@@ -298,7 +288,7 @@ extern PHPAPI zend_class_entry *spl_ce_RuntimeException;
 	MYSQLI_FETCH_RESOURCE((__ptr), MY_STMT *, (__id), "mysqli_stmt", (__check)); \
 	if (!(__ptr)->stmt) { \
 		mysqli_object *intern = Z_MYSQLI_P(__id); \
-		php_error_docref(NULL, E_WARNING, "invalid object or resource %s\n", intern->zo.ce->name->val); \
+		php_error_docref(NULL, E_WARNING, "invalid object or resource %s\n", ZSTR_VAL(intern->zo.ce->name)); \
 		RETURN_NULL();\
 	} \
 }
@@ -342,30 +332,12 @@ ZEND_BEGIN_MODULE_GLOBALS(mysqli)
 	zend_bool 		rollback_on_cached_plink;
 ZEND_END_MODULE_GLOBALS(mysqli)
 
+#define MyG(v) ZEND_MODULE_GLOBALS_ACCESSOR(mysqli, v)
 
-#ifdef ZTS
-#define MyG(v) ZEND_TSRMG(mysqli_globals_id, zend_mysqli_globals *, v)
-#ifdef COMPILE_DL_MYSQLI
-ZEND_TSRMLS_CACHE_EXTERN();
+#if defined(ZTS) && defined(COMPILE_DL_MYSQLI)
+ZEND_TSRMLS_CACHE_EXTERN()
 #endif
-#else
-#define MyG(v) (mysqli_globals.v)
-#endif
-
-#define my_estrdup(x) (x) ? estrdup(x) : NULL
-#define my_efree(x) if (x) efree(x)
 
 ZEND_EXTERN_MODULE_GLOBALS(mysqli)
 
 #endif	/* PHP_MYSQLI_STRUCTS.H */
-
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * indent-tabs-mode: t
- * End:
- * vim600: noet sw=4 ts=4 fdm=marker
- * vim<600: noet sw=4 ts=4
- */

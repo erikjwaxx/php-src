@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | PHP Version 7                                                        |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1997-2015 The PHP Group                                |
+   | Copyright (c) The PHP Group                                          |
    +----------------------------------------------------------------------+
    | This source file is subject to version 3.01 of the PHP license,      |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -17,7 +17,6 @@
    |          Hartmut Holzgraefe <hholzgra@php.net>                       |
    +----------------------------------------------------------------------+
  */
-/* $Id$ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,20 +27,21 @@
 #include "php.h"
 #include "php_globals.h"
 #include "php_standard.h"
+#include "php_memory_streams.h"
 #include "php_fopen_wrappers.h"
 #include "SAPI.h"
 
-static size_t php_stream_output_write(php_stream *stream, const char *buf, size_t count) /* {{{ */
+static ssize_t php_stream_output_write(php_stream *stream, const char *buf, size_t count) /* {{{ */
 {
 	PHPWRITE(buf, count);
 	return count;
 }
 /* }}} */
 
-static size_t php_stream_output_read(php_stream *stream, char *buf, size_t count) /* {{{ */
+static ssize_t php_stream_output_read(php_stream *stream, char *buf, size_t count) /* {{{ */
 {
 	stream->eof = 1;
-	return 0;
+	return -1;
 }
 /* }}} */
 
@@ -51,7 +51,7 @@ static int php_stream_output_close(php_stream *stream, int close_handle) /* {{{ 
 }
 /* }}} */
 
-php_stream_ops php_stream_output_ops = {
+const php_stream_ops php_stream_output_ops = {
 	php_stream_output_write,
 	php_stream_output_read,
 	php_stream_output_close,
@@ -69,20 +69,20 @@ typedef struct php_stream_input { /* {{{ */
 } php_stream_input_t;
 /* }}} */
 
-static size_t php_stream_input_write(php_stream *stream, const char *buf, size_t count) /* {{{ */
+static ssize_t php_stream_input_write(php_stream *stream, const char *buf, size_t count) /* {{{ */
 {
 	return -1;
 }
 /* }}} */
 
-static size_t php_stream_input_read(php_stream *stream, char *buf, size_t count) /* {{{ */
+static ssize_t php_stream_input_read(php_stream *stream, char *buf, size_t count) /* {{{ */
 {
 	php_stream_input_t *input = stream->abstract;
-	size_t read;
+	ssize_t read;
 
 	if (!SG(post_read) && SG(read_post_bytes) < (int64_t)(input->position + count)) {
 		/* read requested data from SAPI */
-		int read_bytes = sapi_read_post_block(buf, count);
+		size_t read_bytes = sapi_read_post_block(buf, count);
 
 		if (read_bytes > 0) {
 			php_stream_seek(input->body, 0, SEEK_END);
@@ -90,7 +90,11 @@ static size_t php_stream_input_read(php_stream *stream, char *buf, size_t count)
 		}
 	}
 
-	php_stream_seek(input->body, input->position, SEEK_SET);
+	if (!input->body->readfilters.head) {
+		/* If the input stream contains filters, it's not really seekable. The
+			input->position is likely to be wrong for unfiltered data. */
+		php_stream_seek(input->body, input->position, SEEK_SET);
+	}
 	read = php_stream_read(input->body, buf, count);
 
 	if (!read || read == (size_t) -1) {
@@ -124,7 +128,7 @@ static int php_stream_input_seek(php_stream *stream, zend_off_t offset, int when
 
 	if (input->body) {
 		int sought = php_stream_seek(input->body, offset, whence);
-		*newoffset = (input->body)->position;
+		*newoffset = input->position = (input->body)->position;
 		return sought;
 	}
 
@@ -132,7 +136,7 @@ static int php_stream_input_seek(php_stream *stream, zend_off_t offset, int when
 }
 /* }}} */
 
-php_stream_ops php_stream_input_ops = {
+const php_stream_ops php_stream_input_ops = {
 	php_stream_input_write,
 	php_stream_input_read,
 	php_stream_input_close,
@@ -177,9 +181,12 @@ php_stream * php_stream_url_wrap_php(php_stream_wrapper *wrapper, const char *pa
 	int fd = -1;
 	int mode_rw = 0;
 	php_stream * stream = NULL;
-	char *p, *token, *pathdup;
+	char *p, *token = NULL, *pathdup;
 	zend_long max_memory;
 	FILE *file = NULL;
+#ifdef PHP_WIN32
+	int pipe_requested = 0;
+#endif
 
 	if (!strncasecmp(path, "php://", 6)) {
 		path += 6;
@@ -192,24 +199,16 @@ php_stream * php_stream_url_wrap_php(php_stream_wrapper *wrapper, const char *pa
 			path += 11;
 			max_memory = ZEND_STRTOL(path, NULL, 10);
 			if (max_memory < 0) {
-				php_error_docref(NULL, E_RECOVERABLE_ERROR, "Max memory must be >= 0");
+				zend_throw_error(NULL, "Max memory must be >= 0");
 				return NULL;
 			}
 		}
-		if (strpbrk(mode, "wa+")) {
-			mode_rw = TEMP_STREAM_DEFAULT;
-		} else {
-			mode_rw = TEMP_STREAM_READONLY;
-		}
+		mode_rw = php_stream_mode_from_str(mode);
 		return php_stream_temp_create(mode_rw, max_memory);
 	}
 
 	if (!strcasecmp(path, "memory")) {
-		if (strpbrk(mode, "wa+")) {
-			mode_rw = TEMP_STREAM_DEFAULT;
-		} else {
-			mode_rw = TEMP_STREAM_READONLY;
-		}
+		mode_rw = php_stream_mode_from_str(mode);
 		return php_stream_memory_create(mode_rw);
 	}
 
@@ -257,6 +256,9 @@ php_stream * php_stream_url_wrap_php(php_stream_wrapper *wrapper, const char *pa
 		} else {
 			fd = dup(STDIN_FILENO);
 		}
+#ifdef PHP_WIN32
+		pipe_requested = 1;
+#endif
 	} else if (!strcasecmp(path, "stdout")) {
 		if (!strcmp(sapi_module.name, "cli")) {
 			static int cli_out = 0;
@@ -270,6 +272,9 @@ php_stream * php_stream_url_wrap_php(php_stream_wrapper *wrapper, const char *pa
 		} else {
 			fd = dup(STDOUT_FILENO);
 		}
+#ifdef PHP_WIN32
+		pipe_requested = 1;
+#endif
 	} else if (!strcasecmp(path, "stderr")) {
 		if (!strcmp(sapi_module.name, "cli")) {
 			static int cli_err = 0;
@@ -283,6 +288,9 @@ php_stream * php_stream_url_wrap_php(php_stream_wrapper *wrapper, const char *pa
 		} else {
 			fd = dup(STDERR_FILENO);
 		}
+#ifdef PHP_WIN32
+		pipe_requested = 1;
+#endif
 	} else if (!strncasecmp(path, "fd/", 3)) {
 		const char *start;
 		char       *end;
@@ -341,7 +349,7 @@ php_stream * php_stream_url_wrap_php(php_stream_wrapper *wrapper, const char *pa
 		pathdup = estrndup(path + 6, strlen(path + 6));
 		p = strstr(pathdup, "/resource=");
 		if (!p) {
-			php_error_docref(NULL, E_RECOVERABLE_ERROR, "No URL resource specified");
+			zend_throw_error(NULL, "No URL resource specified");
 			efree(pathdup);
 			return NULL;
 		}
@@ -379,7 +387,7 @@ php_stream * php_stream_url_wrap_php(php_stream_wrapper *wrapper, const char *pa
 		return NULL;
 	}
 
-#if defined(S_IFSOCK) && !defined(WIN32) && !defined(__BEOS__)
+#if defined(S_IFSOCK) && !defined(PHP_WIN32)
 	do {
 		zend_stat_t st;
 		memset(&st, 0, sizeof(st));
@@ -402,11 +410,19 @@ php_stream * php_stream_url_wrap_php(php_stream_wrapper *wrapper, const char *pa
 		}
 	}
 
+#ifdef PHP_WIN32
+	if (pipe_requested && stream && context) {
+		zval *blocking_pipes = php_stream_context_get_option(context, "pipe", "blocking");
+		if (blocking_pipes) {
+			php_stream_set_option(stream, PHP_STREAM_OPTION_PIPE_BLOCKING, zval_get_long(blocking_pipes), NULL);
+		}
+	}
+#endif
 	return stream;
 }
 /* }}} */
 
-static php_stream_wrapper_ops php_stdio_wops = {
+static const php_stream_wrapper_ops php_stdio_wops = {
 	php_stream_url_wrap_php,
 	NULL, /* close */
 	NULL, /* fstat */
@@ -416,21 +432,12 @@ static php_stream_wrapper_ops php_stdio_wops = {
 	NULL, /* unlink */
 	NULL, /* rename */
 	NULL, /* mkdir */
-	NULL  /* rmdir */
+	NULL, /* rmdir */
+	NULL
 };
 
-PHPAPI php_stream_wrapper php_stream_php_wrapper =	{
+PHPAPI const php_stream_wrapper php_stream_php_wrapper =	{
 	&php_stdio_wops,
 	NULL,
 	0, /* is_url */
 };
-
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: sw=4 ts=4 fdm=marker
- * vim<600: sw=4 ts=4
- */

@@ -2,7 +2,7 @@
   +----------------------------------------------------------------------+
   | PHP Version 7                                                        |
   +----------------------------------------------------------------------+
-  | Copyright (c) 1997-2015 The PHP Group                                |
+  | Copyright (c) The PHP Group                                          |
   +----------------------------------------------------------------------+
   | This source file is subject to version 3.01 of the PHP license,      |
   | that is bundled with this package in the file LICENSE, and is        |
@@ -15,8 +15,6 @@
   | Author: Wez Furlong <wez@php.net>                                    |
   +----------------------------------------------------------------------+
 */
-
-/* $Id$ */
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -311,7 +309,7 @@ void pdo_sqlstate_fini_error_table(void)
 
 int pdo_sqlstate_init_error_table(void)
 {
-	int i;
+	size_t i;
 	const struct pdo_sqlstate_info *info;
 
 	zend_hash_init(&err_hash, sizeof(err_initializer)/sizeof(err_initializer[0]), NULL, NULL, 1);
@@ -333,4 +331,3 @@ const char *pdo_sqlstate_state_to_description(char *state)
 	}
 	return NULL;
 }
-

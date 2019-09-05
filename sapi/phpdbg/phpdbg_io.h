@@ -1,8 +1,8 @@
 /*
    +----------------------------------------------------------------------+
-   | PHP Version 5                                                        |
+   | PHP Version 7                                                        |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1997-2015 The PHP Group                                |
+   | Copyright (c) The PHP Group                                          |
    +----------------------------------------------------------------------+
    | This source file is subject to version 3.01 of the PHP license,      |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -21,6 +21,11 @@
 
 #include "phpdbg.h"
 
+/* Older versions of glibc <= 2.3.0 and <= OS X 10.5 do not have this constant defined */
+#ifndef AI_NUMERICSERV
+#define AI_NUMERICSERV 0
+#endif
+
 PHPDBG_API int phpdbg_consume_stdin_line(char *buf);
 
 PHPDBG_API int phpdbg_consume_bytes(int sock, char *ptr, int len, int tmo);
@@ -33,4 +38,3 @@ PHPDBG_API int phpdbg_open_socket(const char *interface, unsigned short port);
 PHPDBG_API void phpdbg_close_socket(int sock);
 
 #endif /* PHPDBG_IO_H */
-

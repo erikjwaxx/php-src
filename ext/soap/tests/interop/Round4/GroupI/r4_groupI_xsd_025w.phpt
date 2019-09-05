@@ -8,7 +8,7 @@ soap.wsdl_cache_enabled=0
 --FILE--
 <?php
 class SOAPMultiOccursComplexType {
-    function SOAPMultiOccursComplexType($s, $i, $f, $c) {
+    function __construct($s, $i, $f, $c) {
         $this->varString = $s;
         $this->varInt = $i;
         $this->varFloat = $f;
@@ -16,7 +16,7 @@ class SOAPMultiOccursComplexType {
     }
 }
 $struct = new SOAPMultiOccursComplexType("arg",34,12.345,array("red","green","blue"));
-$client = new SoapClient(dirname(__FILE__)."/round4_groupI_xsd.wsdl",array("trace"=>1,"exceptions"=>0));
+$client = new SoapClient(__DIR__."/round4_groupI_xsd.wsdl",array("trace"=>1,"exceptions"=>0));
 $client->echoNestedMultiOccurs(array("inputComplexType"=>$struct));
 echo $client->__getlastrequest();
 $HTTP_RAW_POST_DATA = $client->__getlastrequest();

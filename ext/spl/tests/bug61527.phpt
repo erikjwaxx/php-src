@@ -64,29 +64,19 @@ var_dump($ai4->getChildren());
 ?>
 ==DONE==
 <?php exit(0); ?>
---EXPECTF--
+--EXPECT--
 NULL
 NULL
-
-Notice: ArrayIterator::next(): Array was modified outside object and internal position is no longer valid in %sbug61527.php on line %d
-
-Notice: ArrayIterator::key(): Array was modified outside object and internal position is no longer valid in %sbug61527.php on line %d
-NULL
-
-Notice: ArrayIterator::current(): Array was modified outside object and internal position is no longer valid in %sbug61527.php on line %d
-NULL
-int(5)
+int(4)
 int(5)
 NULL
 NULL
 NULL
 NULL
 NULL
+NULL
+NULL
 bool(false)
-
-Notice: RecursiveArrayIterator::hasChildren(): Array was modified outside object and internal position is no longer valid in %sbug61527.php on line %d
 bool(false)
-
-Notice: RecursiveArrayIterator::getChildren(): Array was modified outside object and internal position is no longer valid in %sbug61527.php on line %d
 NULL
 ==DONE==

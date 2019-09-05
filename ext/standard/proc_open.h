@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | PHP Version 7                                                        |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1997-2015 The PHP Group                                |
+   | Copyright (c) The PHP Group                                          |
    +----------------------------------------------------------------------+
    | This source file is subject to version 3.01 of the PHP license,      |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -15,7 +15,6 @@
    | Author: Wez Furlong <wez@thebrainroom.com>                           |
    +----------------------------------------------------------------------+
  */
-/* $Id$ */
 
 #ifdef PHP_WIN32
 typedef HANDLE php_file_descriptor_t;
@@ -24,8 +23,6 @@ typedef DWORD php_process_id_t;
 typedef int php_file_descriptor_t;
 typedef pid_t php_process_id_t;
 #endif
-
-#define PHP_PROC_OPEN_MAX_DESCRIPTORS	16
 
 /* Environment block under win32 is a NUL terminated sequence of NUL terminated
  * name=value strings.
@@ -44,9 +41,8 @@ struct php_process_handle {
 	HANDLE childHandle;
 #endif
 	int npipes;
-	zend_resource *pipes[PHP_PROC_OPEN_MAX_DESCRIPTORS];
+	zend_resource **pipes;
 	char *command;
 	int is_persistent;
 	php_process_env_t env;
 };
-

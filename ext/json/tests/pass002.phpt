@@ -1,12 +1,10 @@
 --TEST--
 JSON (http://www.crockford.com/JSON/JSON_checker/test/pass2.json)
 --SKIPIF--
-<?php
-  if (!extension_loaded('json')) die('skip: json extension not available');
-?>
+<?php if (!extension_loaded("json")) print "skip"; ?>
 --FILE--
 <?php
-    
+
 $test = '[[[[[[[[[[[[[[[[[[["Not too deep"]]]]]]]]]]]]]]]]]]]';
 echo 'Testing: ' . $test . "\n";
 echo "DECODE: AS OBJECT\n";

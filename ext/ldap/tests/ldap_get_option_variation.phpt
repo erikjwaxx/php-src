@@ -21,6 +21,7 @@ ldap_set_option($link, LDAP_OPT_DEREF, LDAP_DEREF_NEVER);
 ldap_set_option($link, LDAP_OPT_SIZELIMIT, 123);
 ldap_set_option($link, LDAP_OPT_TIMELIMIT, 33);
 ldap_set_option($link, LDAP_OPT_NETWORK_TIMEOUT, 44);
+ldap_set_option($link, LDAP_OPT_TIMEOUT, 55);
 ldap_set_option($link, LDAP_OPT_REFERRALS, false);
 ldap_set_option($link, LDAP_OPT_SERVER_CONTROLS, $controls);
 ldap_set_option($link, LDAP_OPT_CLIENT_CONTROLS, $controls);
@@ -34,6 +35,8 @@ var_dump(
 	ldap_get_option($link, LDAP_OPT_TIMELIMIT, $option),
 	$option,
 	ldap_get_option($link, LDAP_OPT_NETWORK_TIMEOUT, $option),
+	$option,
+	ldap_get_option($link, LDAP_OPT_TIMEOUT, $option),
 	$option,
 	ldap_get_option($link, LDAP_OPT_REFERRALS, $option),
 	$option,
@@ -56,11 +59,51 @@ int(33)
 bool(true)
 int(44)
 bool(true)
+int(55)
+bool(true)
 int(0)
 bool(true)
 int(0)
-bool(false)
-int(0)
-bool(false)
-int(0)
+bool(true)
+array(2) {
+  ["1.2.752.58.10.1"]=>
+  array(3) {
+    ["oid"]=>
+    string(15) "1.2.752.58.10.1"
+    ["iscritical"]=>
+    bool(true)
+    ["value"]=>
+    NULL
+  }
+  ["1.2.752.58.1.10"]=>
+  array(3) {
+    ["oid"]=>
+    string(15) "1.2.752.58.1.10"
+    ["iscritical"]=>
+    bool(false)
+    ["value"]=>
+    string(5) "magic"
+  }
+}
+bool(true)
+array(2) {
+  ["1.2.752.58.10.1"]=>
+  array(3) {
+    ["oid"]=>
+    string(15) "1.2.752.58.10.1"
+    ["iscritical"]=>
+    bool(true)
+    ["value"]=>
+    NULL
+  }
+  ["1.2.752.58.1.10"]=>
+  array(3) {
+    ["oid"]=>
+    string(15) "1.2.752.58.1.10"
+    ["iscritical"]=>
+    bool(false)
+    ["value"]=>
+    string(5) "magic"
+  }
+}
 ===DONE===

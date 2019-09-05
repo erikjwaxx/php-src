@@ -28,9 +28,9 @@ Accessing children nodes
     	$a = tidy_parse_string("<HTML><BODY BGCOLOR=#FFFFFF ALINK=#000000><B>Hi</B><I>Bye<U>Test</U></I></BODY></HTML>", array('newline' => 'LF'));
         $html = $a->html();
         dump_nodes($html);
-            
+
 ?>
---EXPECT--
+--EXPECTF--
 bool(true)
 object(tidyNode)#3 (9) {
   ["value"]=>
@@ -70,7 +70,7 @@ object(tidyNode)#3 (9) {
       ["proprietary"]=>
       bool(false)
       ["id"]=>
-      int(111)
+      int(%i)
       ["attribute"]=>
       NULL
       ["child"]=>
@@ -94,7 +94,7 @@ object(tidyNode)#4 (9) {
   ["proprietary"]=>
   bool(false)
   ["id"]=>
-  int(111)
+  int(%i)
   ["attribute"]=>
   NULL
   ["child"]=>
@@ -222,7 +222,7 @@ object(tidyNode)#5 (9) {
           ["proprietary"]=>
           bool(false)
           ["id"]=>
-          int(114)
+          int(%i)
           ["attribute"]=>
           NULL
           ["child"]=>
@@ -365,7 +365,7 @@ object(tidyNode)#8 (9) {
       ["proprietary"]=>
       bool(false)
       ["id"]=>
-      int(114)
+      int(%i)
       ["attribute"]=>
       NULL
       ["child"]=>
@@ -426,7 +426,7 @@ object(tidyNode)#10 (9) {
   ["proprietary"]=>
   bool(false)
   ["id"]=>
-  int(114)
+  int(%i)
   ["attribute"]=>
   NULL
   ["child"]=>

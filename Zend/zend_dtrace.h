@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | Zend Engine                                                          |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1998-2009 Zend Technologies Ltd. (http://www.zend.com) |
+   | Copyright (c) Zend Technologies Ltd. (http://www.zend.com)           |
    +----------------------------------------------------------------------+
    | This source file is subject to version 2.00 of the Zend license,     |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -16,8 +16,6 @@
    +----------------------------------------------------------------------+
 */
 
-/* $Id: $ */
-
 #ifndef	_ZEND_DTRACE_H
 #define	_ZEND_DTRACE_H
 
@@ -30,9 +28,9 @@ extern "C" {
 #endif
 
 #ifdef HAVE_DTRACE
-ZEND_API zend_op_array *(*zend_dtrace_compile_file)(zend_file_handle *file_handle, int type);
-ZEND_API void (*zend_dtrace_execute)(zend_op_array *op_array);
-ZEND_API void (*zend_dtrace_execute_internal)(zend_execute_data *execute_data, zval *return_value);
+ZEND_API extern zend_op_array *(*zend_dtrace_compile_file)(zend_file_handle *file_handle, int type);
+ZEND_API extern void (*zend_dtrace_execute)(zend_op_array *op_array);
+ZEND_API extern void (*zend_dtrace_execute_internal)(zend_execute_data *execute_data, zval *return_value);
 
 ZEND_API zend_op_array *dtrace_compile_file(zend_file_handle *file_handle, int type);
 ZEND_API void dtrace_execute_ex(zend_execute_data *execute_data);

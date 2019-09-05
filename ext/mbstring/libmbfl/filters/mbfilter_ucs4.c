@@ -42,7 +42,9 @@ const mbfl_encoding mbfl_encoding_ucs4 = {
 	"UCS-4",
 	(const char *(*)[])&mbfl_encoding_ucs4_aliases,
 	NULL,
-	MBFL_ENCTYPE_WCS4BE
+	MBFL_ENCTYPE_WCS4BE,
+	&vtbl_ucs4_wchar,
+	&vtbl_wchar_ucs4
 };
 
 const mbfl_encoding mbfl_encoding_ucs4be = {
@@ -51,7 +53,9 @@ const mbfl_encoding mbfl_encoding_ucs4be = {
 	"UCS-4BE",
 	NULL,
 	NULL,
-	MBFL_ENCTYPE_WCS4BE
+	MBFL_ENCTYPE_WCS4BE,
+	&vtbl_ucs4be_wchar,
+	&vtbl_wchar_ucs4be
 };
 
 const mbfl_encoding mbfl_encoding_ucs4le = {
@@ -60,7 +64,9 @@ const mbfl_encoding mbfl_encoding_ucs4le = {
 	"UCS-4LE",
 	NULL,
 	NULL,
-	MBFL_ENCTYPE_WCS4LE
+	MBFL_ENCTYPE_WCS4LE,
+	&vtbl_ucs4le_wchar,
+	&vtbl_wchar_ucs4le
 };
 
 const struct mbfl_convert_vtbl vtbl_ucs4_wchar = {
@@ -218,9 +224,7 @@ int mbfl_filt_conv_wchar_ucs4be(int c, mbfl_convert_filter *filter)
 		CK((*filter->output_function)((c >> 8) & 0xff, filter->data));
 		CK((*filter->output_function)(c & 0xff, filter->data));
 	} else {
-		if (filter->illegal_mode != MBFL_OUTPUTFILTER_ILLEGAL_MODE_NONE) {
-			CK(mbfl_filt_conv_illegal_output(c, filter));
-		}
+		CK(mbfl_filt_conv_illegal_output(c, filter));
 	}
 
 	return c;
@@ -264,12 +268,8 @@ int mbfl_filt_conv_wchar_ucs4le(int c, mbfl_convert_filter *filter)
 		CK((*filter->output_function)((c >> 16) & 0xff, filter->data));
 		CK((*filter->output_function)((c >> 24) & 0xff, filter->data));
 	} else {
-		if (filter->illegal_mode != MBFL_OUTPUTFILTER_ILLEGAL_MODE_NONE) {
-			CK(mbfl_filt_conv_illegal_output(c, filter));
-		}
+		CK(mbfl_filt_conv_illegal_output(c, filter));
 	}
 
 	return c;
 }
-
-

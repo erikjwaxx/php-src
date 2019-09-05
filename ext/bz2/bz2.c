@@ -2,7 +2,7 @@
   +----------------------------------------------------------------------+
   | PHP Version 7                                                        |
   +----------------------------------------------------------------------+
-  | Copyright (c) 1997-2015 The PHP Group                                |
+  | Copyright (c) The PHP Group                                          |
   +----------------------------------------------------------------------+
   | This source file is subject to version 3.01 of the PHP license,      |
   | that is bundled with this package in the file LICENSE, and is        |
@@ -16,14 +16,13 @@
   +----------------------------------------------------------------------+
 */
 
-/* $Id$ */
-
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
 
 #include "php.h"
 #include "php_bz2.h"
+#include "bz2_arginfo.h"
 
 #if HAVE_BZ2
 
@@ -52,57 +51,12 @@ static PHP_FUNCTION(bzerror);
 static PHP_FUNCTION(bzcompress);
 static PHP_FUNCTION(bzdecompress);
 
-/* {{{ arginfo */
-ZEND_BEGIN_ARG_INFO_EX(arginfo_bzread, 0, 0, 1)
-	ZEND_ARG_INFO(0, bz)
-	ZEND_ARG_INFO(0, length)
-ZEND_END_ARG_INFO()
-
-ZEND_BEGIN_ARG_INFO(arginfo_bzopen, 0)
-	ZEND_ARG_INFO(0, file)
-	ZEND_ARG_INFO(0, mode)
-ZEND_END_ARG_INFO()
-
-ZEND_BEGIN_ARG_INFO(arginfo_bzerrno, 0)
-	ZEND_ARG_INFO(0, bz)
-ZEND_END_ARG_INFO()
-
-ZEND_BEGIN_ARG_INFO(arginfo_bzerrstr, 0)
-	ZEND_ARG_INFO(0, bz)
-ZEND_END_ARG_INFO()
-
-ZEND_BEGIN_ARG_INFO(arginfo_bzerror, 0)
-	ZEND_ARG_INFO(0, bz)
-ZEND_END_ARG_INFO()
-
-ZEND_BEGIN_ARG_INFO_EX(arginfo_bzcompress, 0, 0, 2)
-	ZEND_ARG_INFO(0, source)
-	ZEND_ARG_INFO(0, blocksize)
-	ZEND_ARG_INFO(0, workfactor)
-ZEND_END_ARG_INFO()
-
-ZEND_BEGIN_ARG_INFO_EX(arginfo_bzdecompress, 0, 0, 1)
-	ZEND_ARG_INFO(0, source)
-	ZEND_ARG_INFO(0, small)
-ZEND_END_ARG_INFO()
-
-ZEND_BEGIN_ARG_INFO_EX(arginfo_bzwrite, 0, 0, 2)
-	ZEND_ARG_INFO(0, fp)
-	ZEND_ARG_INFO(0, str)
-	ZEND_ARG_INFO(0, length)
-ZEND_END_ARG_INFO()
-
-ZEND_BEGIN_ARG_INFO(arginfo_bzflush, 0)
-	ZEND_ARG_INFO(0, fp)
-ZEND_END_ARG_INFO()
-/* }}} */
-
 static const zend_function_entry bz2_functions[] = {
 	PHP_FE(bzopen,       arginfo_bzopen)
 	PHP_FE(bzread,       arginfo_bzread)
 	PHP_FALIAS(bzwrite,   fwrite,		arginfo_bzwrite)
 	PHP_FALIAS(bzflush,   fflush,		arginfo_bzflush)
-	PHP_FALIAS(bzclose,   fclose,		arginfo_bzflush)
+	PHP_FALIAS(bzclose,   fclose,		arginfo_bzclose)
 	PHP_FE(bzerrno,      arginfo_bzerrno)
 	PHP_FE(bzerrstr,     arginfo_bzerrstr)
 	PHP_FE(bzerror,      arginfo_bzerror)
@@ -120,7 +74,7 @@ zend_module_entry bz2_module_entry = {
 	NULL,
 	NULL,
 	PHP_MINFO(bz2),
-	NO_VERSION_YET,
+	PHP_BZ2_VERSION,
 	STANDARD_MODULE_PROPERTIES
 };
 
@@ -135,7 +89,7 @@ struct php_bz2_stream_data_t {
 
 /* {{{ BZip2 stream implementation */
 
-static size_t php_bz2iop_read(php_stream *stream, char *buf, size_t count)
+static ssize_t php_bz2iop_read(php_stream *stream, char *buf, size_t count)
 {
 	struct php_bz2_stream_data_t *self = (struct php_bz2_stream_data_t *)stream->abstract;
 	size_t ret = 0;
@@ -148,7 +102,14 @@ static size_t php_bz2iop_read(php_stream *stream, char *buf, size_t count)
 		just_read = BZ2_bzread(self->bz_file, buf, to_read);
 
 		if (just_read < 1) {
-			stream->eof = 0 == just_read;
+			/* it is not safe to keep reading after an error, see #72613 */
+			stream->eof = 1;
+			if (just_read < 0) {
+				if (ret) {
+					return ret;
+				}
+				return -1;
+			}
 			break;
 		}
 
@@ -158,11 +119,10 @@ static size_t php_bz2iop_read(php_stream *stream, char *buf, size_t count)
 	return ret;
 }
 
-static size_t php_bz2iop_write(php_stream *stream, const char *buf, size_t count)
+static ssize_t php_bz2iop_write(php_stream *stream, const char *buf, size_t count)
 {
-	size_t wrote = 0;
+	ssize_t wrote = 0;
 	struct php_bz2_stream_data_t *self = (struct php_bz2_stream_data_t *)stream->abstract;
-
 
 	do {
 		int just_wrote;
@@ -170,8 +130,13 @@ static size_t php_bz2iop_write(php_stream *stream, const char *buf, size_t count
 		int to_write = (int)(remain <= INT_MAX ? remain : INT_MAX);
 
 		just_wrote = BZ2_bzwrite(self->bz_file, (char*)buf, to_write);
-
-		if (just_wrote < 1) {
+		if (just_wrote < 0) {
+			if (wrote == 0) {
+				return just_wrote;
+			}
+			return wrote;
+		}
+		if (just_wrote == 0) {
 			break;
 		}
 
@@ -207,7 +172,7 @@ static int php_bz2iop_flush(php_stream *stream)
 }
 /* }}} */
 
-php_stream_ops php_stream_bz2io_ops = {
+const php_stream_ops php_stream_bz2io_ops = {
 	php_bz2iop_write, php_bz2iop_read,
 	php_bz2iop_close, php_bz2iop_flush,
 	"BZip2",
@@ -226,6 +191,9 @@ PHP_BZ2_API php_stream *_php_stream_bz2open_from_BZFILE(BZFILE *bz,
 	self = emalloc(sizeof(*self));
 
 	self->stream = innerstream;
+	if (innerstream) {
+		GC_ADDREF(innerstream->res);
+	}
 	self->bz_file = bz;
 
 	return php_stream_alloc_rel(&php_stream_bz2io_ops, self, 0, mode);
@@ -252,7 +220,7 @@ PHP_BZ2_API php_stream *_php_stream_bz2open(php_stream_wrapper *wrapper,
 #ifdef VIRTUAL_DIR
 	virtual_filepath_ex(path, &path_copy, NULL);
 #else
-	path_copy = path;
+	path_copy = (char *)path;
 #endif
 
 	if (php_check_open_basedir(path_copy)) {
@@ -288,7 +256,7 @@ PHP_BZ2_API php_stream *_php_stream_bz2open(php_stream_wrapper *wrapper,
 		 * failed.
 		 */
 		if (opened_path && !bz_file && mode[0] == 'w') {
-			VCWD_UNLINK((*opened_path)->val);
+			VCWD_UNLINK(ZSTR_VAL(*opened_path));
 		}
 	}
 
@@ -310,7 +278,7 @@ PHP_BZ2_API php_stream *_php_stream_bz2open(php_stream_wrapper *wrapper,
 
 /* }}} */
 
-static php_stream_wrapper_ops bzip2_stream_wops = {
+static const php_stream_wrapper_ops bzip2_stream_wops = {
 	_php_stream_bz2open,
 	NULL, /* close */
 	NULL, /* fstat */
@@ -320,10 +288,11 @@ static php_stream_wrapper_ops bzip2_stream_wops = {
 	NULL, /* unlink */
 	NULL, /* rename */
 	NULL, /* mkdir */
-	NULL  /* rmdir */
+	NULL, /* rmdir */
+	NULL
 };
 
-static php_stream_wrapper php_stream_bzip2_wrapper = {
+static const php_stream_wrapper php_stream_bzip2_wrapper = {
 	&bzip2_stream_wops,
 	NULL,
 	0 /* is_url */
@@ -366,7 +335,7 @@ static PHP_FUNCTION(bzread)
 	zend_string *data;
 
 	if (FAILURE == zend_parse_parameters(ZEND_NUM_ARGS(), "r|l", &bz, &len)) {
-		RETURN_FALSE;
+		return;
 	}
 
 	php_stream_from_zval(stream, bz);
@@ -375,10 +344,11 @@ static PHP_FUNCTION(bzread)
 		php_error_docref(NULL, E_WARNING, "length may not be negative");
 		RETURN_FALSE;
 	}
-	data = zend_string_alloc(len, 0);
-	data->len = php_stream_read(stream, data->val, data->len);
-	data->val[data->len] = '\0';
 
+	data = php_stream_read_to_str(stream, len);
+	if (!data) {
+		RETURN_FALSE;
+	}
 	RETURN_STR(data);
 }
 /* }}} */
@@ -508,13 +478,11 @@ static PHP_FUNCTION(bzcompress)
 	int               error,           /* Error Container */
 					  block_size  = 4, /* Block size for compression algorithm */
 					  work_factor = 0, /* Work factor for compression algorithm */
-					  argc;            /* Argument count */
+					  argc = ZEND_NUM_ARGS(); /* Argument count */
 	size_t               source_len;      /* Length of the source data */
 	unsigned int      dest_len;        /* Length of the destination buffer */
 
-	argc = ZEND_NUM_ARGS();
-
-	if (zend_parse_parameters(ZEND_NUM_ARGS(), "s|ll", &source, &source_len, &zblock_size, &zwork_factor) == FAILURE) {
+	if (zend_parse_parameters(argc, "s|ll", &source, &source_len, &zblock_size, &zwork_factor) == FAILURE) {
 		return;
 	}
 
@@ -536,16 +504,16 @@ static PHP_FUNCTION(bzcompress)
 		work_factor = zwork_factor;
 	}
 
-	error = BZ2_bzBuffToBuffCompress(dest->val, &dest_len, source, source_len, block_size, 0, work_factor);
+	error = BZ2_bzBuffToBuffCompress(ZSTR_VAL(dest), &dest_len, source, source_len, block_size, 0, work_factor);
 	if (error != BZ_OK) {
-		zend_string_free(dest);
+		zend_string_efree(dest);
 		RETURN_LONG(error);
 	} else {
 		/* Copy the buffer, we have perhaps allocate a lot more than we need,
 		   so we erealloc() the buffer to the proper size */
-		dest->len = dest_len;
-		dest->val[dest->len] = '\0';
-		RETURN_STR(dest);
+		ZSTR_LEN(dest) = dest_len;
+		ZSTR_VAL(dest)[ZSTR_LEN(dest)] = '\0';
+		RETURN_NEW_STR(dest);
 	}
 }
 /* }}} */
@@ -554,7 +522,8 @@ static PHP_FUNCTION(bzcompress)
    Decompresses BZip2 compressed data */
 static PHP_FUNCTION(bzdecompress)
 {
-	char *source, *dest;
+	char *source;
+	zend_string *dest;
 	size_t source_len;
 	int error;
 	zend_long small = 0;
@@ -566,7 +535,7 @@ static PHP_FUNCTION(bzdecompress)
 	bz_stream bzs;
 
 	if (FAILURE == zend_parse_parameters(ZEND_NUM_ARGS(), "s|l", &source, &source_len, &small)) {
-		RETURN_FALSE;
+		return;
 	}
 
 	bzs.bzalloc = NULL;
@@ -580,25 +549,41 @@ static PHP_FUNCTION(bzdecompress)
 	bzs.avail_in = source_len;
 
 	/* in most cases bz2 offers at least 2:1 compression, so we use that as our base */
+	dest = zend_string_safe_alloc(source_len, 2, 1, 0);
 	bzs.avail_out = source_len * 2;
-	bzs.next_out = dest = emalloc(bzs.avail_out + 1);
+	bzs.next_out = ZSTR_VAL(dest);
 
 	while ((error = BZ2_bzDecompress(&bzs)) == BZ_OK && bzs.avail_in > 0) {
 		/* compression is better then 2:1, need to allocate more memory */
 		bzs.avail_out = source_len;
 		size = (bzs.total_out_hi32 * (unsigned int) -1) + bzs.total_out_lo32;
-		dest = safe_erealloc(dest, 1, bzs.avail_out+1, (size_t) size );
-		bzs.next_out = dest + size;
+#if !ZEND_ENABLE_ZVAL_LONG64
+		if (size > SIZE_MAX) {
+			/* no reason to continue if we're going to drop it anyway */
+			break;
+		}
+#endif
+		dest = zend_string_safe_realloc(dest, 1, bzs.avail_out+1, (size_t) size, 0);
+		bzs.next_out = ZSTR_VAL(dest) + size;
 	}
 
 	if (error == BZ_STREAM_END || error == BZ_OK) {
 		size = (bzs.total_out_hi32 * (unsigned int) -1) + bzs.total_out_lo32;
-		dest = safe_erealloc(dest, 1, (size_t) size, 1);
-		dest[size] = '\0';
-		RETVAL_STRINGL(dest, (int) size);
-		efree(dest);
+#if !ZEND_ENABLE_ZVAL_LONG64
+		if (UNEXPECTED(size > SIZE_MAX)) {
+			php_error_docref(NULL, E_WARNING, "Decompressed size too big, max is %zd", SIZE_MAX);
+			zend_string_efree(dest);
+			RETVAL_LONG(BZ_MEM_ERROR);
+		} else
+#endif
+		{
+			dest = zend_string_safe_realloc(dest, 1, (size_t)size, 1, 0);
+			ZSTR_LEN(dest) = (size_t)size;
+			ZSTR_VAL(dest)[(size_t)size] = '\0';
+			RETVAL_STR(dest);
+		}
 	} else { /* real error */
-		efree(dest);
+		zend_string_efree(dest);
 		RETVAL_LONG(error);
 	}
 
@@ -650,12 +635,3 @@ static void php_bz2_error(INTERNAL_FUNCTION_PARAMETERS, int opt)
 /* }}} */
 
 #endif
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: fdm=marker
- * vim: noet sw=4 ts=4
- */

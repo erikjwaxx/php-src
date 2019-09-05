@@ -7,14 +7,14 @@ soap.wsdl_cache_enabled=0
 --FILE--
 <?php
 class SOAPList {
-    function SOAPList($s, $i, $c) {
+    function __construct($s, $i, $c) {
         $this->varString = $s;
         $this->varInt = $i;
         $this->child = $c;
     }
 }
 $struct = new SOAPList('arg1',1, new SOAPList('arg2',2,NULL));
-$client = new SoapClient(dirname(__FILE__)."/round3_groupE_list.wsdl",array("trace"=>1,"exceptions"=>0));
+$client = new SoapClient(__DIR__."/round3_groupE_list.wsdl",array("trace"=>1,"exceptions"=>0));
 $client->echoLinkedList($struct);
 echo $client->__getlastrequest();
 $HTTP_RAW_POST_DATA = $client->__getlastrequest();

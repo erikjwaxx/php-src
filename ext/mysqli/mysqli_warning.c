@@ -2,7 +2,7 @@
   +----------------------------------------------------------------------+
   | PHP Version 7                                                        |
   +----------------------------------------------------------------------+
-  | Copyright (c) 1997-2015 The PHP Group                                |
+  | Copyright (c) The PHP Group                                          |
   +----------------------------------------------------------------------+
   | This source file is subject to version 3.01 of the PHP license,      |
   | that is bundled with this package in the file LICENSE, and is        |
@@ -29,7 +29,7 @@
 #include "mysqli_priv.h"
 
 /* Define these in the PHP7 tree to make merging easy process */
-#define Zzend_string_dupLICATE (1<<0)
+#define ZSTR_DUPLICATE (1<<0)
 #define ZSTR_AUTOFREE  (1<<1)
 
 #define ZVAL_UTF8_STRING(z, s, flags)          ZVAL_STRING((z), (char*)(s))
@@ -42,8 +42,8 @@ void php_clear_warnings(MYSQLI_WARNING *w)
 
 	while (w) {
 		n = w;
-		zval_dtor(&(w->reason));
-		zval_dtor(&(w->sqlstate));
+		zval_ptr_dtor_str(&(w->reason));
+		zval_ptr_dtor_str(&(w->sqlstate));
 		w = w->next;
 		efree(n);
 	}
@@ -59,9 +59,9 @@ MYSQLI_WARNING *php_new_warning(const char *reason, int errorno)
 
 	w = (MYSQLI_WARNING *)ecalloc(1, sizeof(MYSQLI_WARNING));
 
-	ZVAL_UTF8_STRING(&(w->reason), reason, Zzend_string_dupLICATE);
+	ZVAL_UTF8_STRING(&(w->reason), reason, ZSTR_DUPLICATE);
 
-	ZVAL_UTF8_STRINGL(&(w->sqlstate), "HY000", sizeof("HY000") - 1,  Zzend_string_dupLICATE);
+	ZVAL_UTF8_STRINGL(&(w->sqlstate), "HY000", sizeof("HY000") - 1,  ZSTR_DUPLICATE);
 
 	w->errorno = errorno;
 
@@ -99,18 +99,16 @@ MYSQLI_WARNING *php_get_warnings(MYSQL *mysql)
 #else
 /* {{{ MYSQLI_WARNING *php_new_warning */
 static
-MYSQLI_WARNING *php_new_warning(const zval * reason, int errorno)
+MYSQLI_WARNING *php_new_warning(zval * reason, int errorno)
 {
 	MYSQLI_WARNING *w;
 
 	w = (MYSQLI_WARNING *)ecalloc(1, sizeof(MYSQLI_WARNING));
 
-	ZVAL_DUP(&w->reason, (zval *)reason);
+	ZVAL_COPY(&w->reason, reason);
 	convert_to_string(&w->reason);
 
-	//????ZVAL_UTF8_STRINGL(&(w->reason),  Z_STRVAL(w->reason), Z_STRLEN(w->reason),  ZSTR_AUTOFREE);
-
-	ZVAL_UTF8_STRINGL(&(w->sqlstate), "HY000", sizeof("HY000") - 1,  Zzend_string_dupLICATE);
+	ZVAL_UTF8_STRINGL(&(w->sqlstate), "HY000", sizeof("HY000") - 1,  ZSTR_DUPLICATE);
 
 	w->errorno = errorno;
 
@@ -146,8 +144,7 @@ MYSQLI_WARNING * php_get_warnings(MYSQLND_CONN_DATA * mysql)
 
 		/* 1. Here comes the error no */
 		entry = zend_hash_get_current_data(Z_ARRVAL(row));
-		convert_to_long_ex(entry);
-		errno = Z_LVAL_P(entry);
+		errno = zval_get_long(entry);
 		zend_hash_move_forward(Z_ARRVAL(row));
 
 		/* 2. Here comes the reason */
@@ -259,10 +256,7 @@ PHP_METHOD(mysqli_warning, __construct)
 	MYSQLI_WARNING  *w;
 	MYSQLI_RESOURCE *mysqli_resource;
 
-	if (ZEND_NUM_ARGS() != 1) {
-		WRONG_PARAM_COUNT;
-	}
-	if (zend_parse_parameters(1, "o", &z)==FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "o", &z) == FAILURE) {
 		return;
 	}
 	obj = Z_MYSQLI_P(z);
@@ -317,7 +311,7 @@ PHP_METHOD(mysqli_warning, __construct)
 const zend_function_entry mysqli_warning_methods[] = {
 	PHP_ME(mysqli_warning, __construct,		NULL, ZEND_ACC_PROTECTED)
 	PHP_ME(mysqli_warning, next, 			NULL, ZEND_ACC_PUBLIC)
-	{NULL, NULL, NULL}
+	PHP_FE_END
 };
 /* }}} */
 
@@ -329,13 +323,3 @@ const mysqli_property_entry mysqli_warning_property_entries[] = {
 	{NULL, 0, NULL, NULL}
 };
 /* }}} */
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * indent-tabs-mode: t
- * End:
- * vim600: noet sw=4 ts=4 fdm=marker
- * vim<600: noet sw=4 ts=4
- */

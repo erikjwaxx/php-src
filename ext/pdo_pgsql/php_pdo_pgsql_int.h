@@ -2,7 +2,7 @@
   +----------------------------------------------------------------------+
   | PHP Version 7                                                        |
   +----------------------------------------------------------------------+
-  | Copyright (c) 1997-2015 The PHP Group                                |
+  | Copyright (c) The PHP Group                                          |
   +----------------------------------------------------------------------+
   | This source file is subject to version 3.01 of the PHP license,      |
   | that is bundled with this package in the file LICENSE, and is        |
@@ -17,8 +17,6 @@
   |          Wez Furlong <wez@php.net>                                   |
   +----------------------------------------------------------------------+
 */
-
-/* $Id$ */
 
 #ifndef PHP_PDO_PGSQL_INT_H
 #define PHP_PDO_PGSQL_INT_H
@@ -43,25 +41,24 @@ typedef struct {
 	unsigned 	_reserved:31;
 	pdo_pgsql_error_info	einfo;
 	Oid 		pgoid;
+	unsigned int	stmt_counter;
 	/* The following two variables have the same purpose. Unfortunately we need
 	   to keep track of two different attributes having the same effect. */
-	int		emulate_prepares;
-	int		disable_native_prepares; /* deprecated since 5.6 */
-	int		disable_prepares;
-	unsigned int	stmt_counter;
+	zend_bool		emulate_prepares;
+	zend_bool		disable_native_prepares; /* deprecated since 5.6 */
+	zend_bool		disable_prepares;
 } pdo_pgsql_db_handle;
 
 typedef struct {
 	char         *def;
+	zend_long    intval;
 	Oid          pgsql_type;
-	zend_long         intval;
 	zend_bool    boolval;
 } pdo_pgsql_column;
 
 typedef struct {
 	pdo_pgsql_db_handle     *H;
 	PGresult                *result;
-	int                     current_row;
 	pdo_pgsql_column        *cols;
 	char *cursor_name;
 	char *stmt_name;
@@ -70,6 +67,7 @@ typedef struct {
 	int *param_lengths;
 	int *param_formats;
 	Oid *param_types;
+	int                     current_row;
 	zend_bool is_prepared;
 } pdo_pgsql_stmt;
 
@@ -77,7 +75,7 @@ typedef struct {
 	Oid     oid;
 } pdo_pgsql_bound_param;
 
-extern pdo_driver_t pdo_pgsql_driver;
+extern const pdo_driver_t pdo_pgsql_driver;
 
 extern int _pdo_pgsql_error(pdo_dbh_t *dbh, pdo_stmt_t *stmt, int errcode, const char *sqlstate, const char *msg, const char *file, int line);
 #define pdo_pgsql_error(d,e,z)	_pdo_pgsql_error(d, NULL, e, z, NULL, __FILE__, __LINE__)
@@ -85,13 +83,12 @@ extern int _pdo_pgsql_error(pdo_dbh_t *dbh, pdo_stmt_t *stmt, int errcode, const
 #define pdo_pgsql_error_stmt(s,e,z)	_pdo_pgsql_error(s->dbh, s, e, z, NULL, __FILE__, __LINE__)
 #define pdo_pgsql_error_stmt_msg(s,e,m)	_pdo_pgsql_error(s->dbh, s, e, NULL, m, __FILE__, __LINE__)
 
-extern struct pdo_stmt_methods pgsql_stmt_methods;
+extern const struct pdo_stmt_methods pgsql_stmt_methods;
 
 #define pdo_pgsql_sqlstate(r) PQresultErrorField(r, PG_DIAG_SQLSTATE)
 
 enum {
-	PDO_PGSQL_ATTR_DISABLE_NATIVE_PREPARED_STATEMENT = PDO_ATTR_DRIVER_SPECIFIC,
-	PDO_PGSQL_ATTR_DISABLE_PREPARES,
+	PDO_PGSQL_ATTR_DISABLE_PREPARES = PDO_ATTR_DRIVER_SPECIFIC,
 };
 
 struct pdo_pgsql_lob_self {
@@ -110,15 +107,6 @@ enum pdo_pgsql_specific_constants {
 };
 
 php_stream *pdo_pgsql_create_lob_stream(zval *pdh, int lfd, Oid oid);
-extern php_stream_ops pdo_pgsql_lob_stream_ops;
+extern const php_stream_ops pdo_pgsql_lob_stream_ops;
 
 #endif /* PHP_PDO_PGSQL_INT_H */
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: noet sw=4 ts=4 fdm=marker
- * vim<600: noet sw=4 ts=4
- */

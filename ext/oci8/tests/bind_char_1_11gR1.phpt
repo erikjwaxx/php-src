@@ -3,7 +3,7 @@ SELECT oci_bind_by_name with SQLT_AFC aka CHAR
 --SKIPIF--
 <?php
 if (!extension_loaded('oci8')) die ("skip no oci8 extension");
-require(dirname(__FILE__)."/connect.inc");
+require(__DIR__."/connect.inc");
 // The bind buffer size edge cases seem to change each DB version.
 preg_match('/.*Release ([[:digit:]]+)\.([[:digit:]]+)\.([[:digit:]]+)\.([[:digit:]]+)\.([[:digit:]]+)*/', oci_server_version($c), $matches);
 if (!(isset($matches[0]) && $matches[1] < 12)) {
@@ -11,13 +11,13 @@ if (!(isset($matches[0]) && $matches[1] < 12)) {
 }
 ?>
 --ENV--
-NLS_LANG=
+NLS_LANG=.AL32UTF8
 --FILE--
 <?php
 
 // Output is for 32 bit client to 64bit 11.1.0.6
 
-require(dirname(__FILE__).'/connect.inc');
+require(__DIR__.'/connect.inc');
 
 // Initialization
 
@@ -28,7 +28,7 @@ $stmtarray = array(
 	"insert into bind_char_tab values (2, NULL, 'abc')",
 	"insert into bind_char_tab values (3, NULL, 'abc       ')"
 );
-						 
+
 oci8_test_sql_execute($c, $stmtarray);
 
 // Run Test
@@ -198,7 +198,7 @@ function do_e_q($s)
 $stmtarray = array(
 	"drop table bind_char_tab"
 );
-						 
+
 oci8_test_sql_execute($c, $stmtarray);
 
 echo "Done\n";
@@ -215,7 +215,9 @@ Test 1.2: Type: AFC.  Length: default
     ::
 Test 1.3: Type: AFC:  Length: 0
   Querying:
-    Oci_execute error ORA-1460 Exiting Query
+    :1:
+    :abc       :
+    ::
 Test 1.4: Type: AFC:  Length: strlen
   Querying:
     :1:
@@ -223,7 +225,6 @@ Test 1.4: Type: AFC:  Length: strlen
     ::
 Test 1.5: Type: AFC.  Length: strlen-1
   Querying:
-    Oci_execute error ORA-1460 Exiting Query
 Test 1.6: Type: AFC.  Length: strlen+1
   Querying:
     :1:
@@ -259,7 +260,9 @@ Test 3.2: Type: AFC.  Length: default
     :abc:
 Test 3.3: Type: AFC:  Length: 0
   Querying:
-    Oci_execute error ORA-1460 Exiting Query
+    :2:
+    ::
+    :abc:
 Test 3.4: Type: AFC:  Length: strlen
   Querying:
     :2:
@@ -267,7 +270,6 @@ Test 3.4: Type: AFC:  Length: strlen
     :abc:
 Test 3.5: Type: AFC.  Length: strlen-1
   Querying:
-    Oci_execute error ORA-1460 Exiting Query
 Test 3.6: Type: AFC.  Length: strlen+1
   Querying:
     :2:

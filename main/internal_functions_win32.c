@@ -2,7 +2,7 @@
 	+----------------------------------------------------------------------+
 	| PHP Version 7                                                        |
 	+----------------------------------------------------------------------+
-	| Copyright (c) 1997-2015 The PHP Group                                |
+	| Copyright (c) The PHP Group                                          |
 	+----------------------------------------------------------------------+
 	| This source file is subject to version 3.01 of the PHP license,      |
 	| that is bundled with this package in the file LICENSE, and is        |
@@ -12,12 +12,10 @@
 	| obtain it through the world-wide-web, please send a note to          |
 	| license@php.net so we can mail you a copy immediately.               |
 	+----------------------------------------------------------------------+
-	| Authors: Andi Gutmans <andi@zend.com>                                |
-	|          Zeev Suraski <zeev@zend.com>                                |
+	| Authors: Andi Gutmans <andi@php.net>                                 |
+	|          Zeev Suraski <zeev@php.net>                                 |
 	+----------------------------------------------------------------------+
 */
-
-/* $Id$ */
 
 /* {{{ includes
  */
@@ -54,9 +52,7 @@
 #if HAVE_CTYPE
 #include "ext/ctype/php_ctype.h"
 #endif
-#if HAVE_DATE
 #include "ext/date/php_date.h"
-#endif
 #if HAVE_FTP
 #include "ext/ftp/php_ftp.h"
 #endif
@@ -64,9 +60,7 @@
 #include "ext/iconv/php_iconv.h"
 #endif
 #include "ext/standard/reg.h"
-#if HAVE_PCRE || HAVE_BUNDLED_PCRE
 #include "ext/pcre/php_pcre.h"
-#endif
 #if HAVE_UODBC
 #include "ext/odbc/php_odbc.h"
 #endif
@@ -94,16 +88,8 @@
 #if HAVE_XML
 #include "ext/xml/php_xml.h"
 #endif
-#if HAVE_XML && HAVE_WDDX
-#include "ext/wddx/php_wddx.h"
-#endif
-#ifdef HAVE_SQLITE
-#include "ext/sqlite/php_sqlite.h"
-#endif
 #include "ext/com_dotnet/php_com_dotnet.h"
-#ifdef HAVE_SPL
 #include "ext/spl/php_spl.h"
-#endif
 #if HAVE_XML && HAVE_XMLREADER
 #include "ext/xmlreader/php_xmlreader.h"
 #endif
@@ -114,7 +100,7 @@
 
 /* {{{ php_builtin_extensions[]
  */
-static zend_module_entry *php_builtin_extensions[] = {
+static zend_module_entry * const php_builtin_extensions[] = {
 	phpext_standard_ptr
 #if HAVE_BCMATH
 	,phpext_bcmath_ptr
@@ -126,15 +112,11 @@ static zend_module_entry *php_builtin_extensions[] = {
 #if HAVE_CTYPE
 	,phpext_ctype_ptr
 #endif
-#if HAVE_DATE
 	,phpext_date_ptr
-#endif
 #if HAVE_FTP
 	,phpext_ftp_ptr
 #endif
-#if HAVE_HASH
 	,phpext_hash_ptr
-#endif
 #if HAVE_ICONV
 	,phpext_iconv_ptr
 #endif
@@ -144,9 +126,7 @@ static zend_module_entry *php_builtin_extensions[] = {
 #if HAVE_UODBC
 	,phpext_odbc_ptr
 #endif
-#if HAVE_PCRE || HAVE_BUNDLED_PCRE
 	,phpext_pcre_ptr
-#endif
 	,phpext_reflection_ptr
 #if HAVE_PHP_SESSION
 	,phpext_session_ptr
@@ -169,15 +149,7 @@ static zend_module_entry *php_builtin_extensions[] = {
 #if HAVE_XML
 	,phpext_xml_ptr
 #endif
-#if HAVE_XML && HAVE_WDDX
-	,phpext_wddx_ptr
-#endif
-#if HAVE_SQLITE
-	,phpext_sqlite_ptr
-#endif
-#if HAVE_SPL
 	,phpext_spl_ptr
-#endif
 #if HAVE_XML && HAVE_XMLREADER
 	,phpext_xmlreader_ptr
 #endif
@@ -193,12 +165,3 @@ PHPAPI int php_register_internal_extensions(void)
 {
 	return php_register_extensions(php_builtin_extensions, EXTCOUNT);
 }
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: sw=4 ts=4 fdm=marker
- * vim<600: sw=4 ts=4
- */

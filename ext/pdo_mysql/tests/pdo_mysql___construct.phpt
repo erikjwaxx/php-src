@@ -2,13 +2,13 @@
 MySQL PDO->__construct() - Generic + DSN
 --SKIPIF--
 <?php
-require_once(dirname(__FILE__) . DIRECTORY_SEPARATOR . 'skipif.inc');
-require_once(dirname(__FILE__) . DIRECTORY_SEPARATOR . 'mysql_pdo_test.inc');
+require_once(__DIR__ . DIRECTORY_SEPARATOR . 'skipif.inc');
+require_once(__DIR__ . DIRECTORY_SEPARATOR . 'mysql_pdo_test.inc');
 MySQLPDOTest::skip();
 ?>
 --FILE--
 <?php
-	require_once(dirname(__FILE__) . DIRECTORY_SEPARATOR . 'mysql_pdo_test.inc');
+	require_once(__DIR__ . DIRECTORY_SEPARATOR . 'mysql_pdo_test.inc');
 
 	function tryandcatch($offset, $code) {
 
@@ -28,8 +28,11 @@ MySQLPDOTest::skip();
 
 	try {
 
-		if (NULL !== ($db = @new PDO()))
-			printf("[001] Too few parameters\n");
+	    try {
+			if (NULL !== ($db = @new PDO()))
+				printf("[001] Too few parameters\n");
+		} catch (TypeError $ex) {
+		}
 
 		print tryandcatch(2, '$db = new PDO(chr(0));');
 		print tryandcatch(3, '$db = new PDO("a" . chr(0) . "b");');

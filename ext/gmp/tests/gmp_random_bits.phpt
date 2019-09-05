@@ -5,7 +5,6 @@ gmp_random_bits() basic tests
 --FILE--
 <?php
 
-var_dump(gmp_random_bits());
 var_dump(gmp_random_bits(0));
 var_dump(gmp_random_bits(-1));
 
@@ -13,7 +12,7 @@ var_dump(gmp_random_bits(-1));
 gmp_random_bits(1);
 gmp_random_bits(1024);
 
-// 2 seconds to make sure the numbers stay in range
+// 0.5 seconds to make sure the numbers stay in range
 $start = microtime(true);
 $limit = (2 ** 30) - 1;
 while (1) {
@@ -26,7 +25,7 @@ while (1) {
 		}
 	}
 
-	if (microtime(true) - $start > 2) {
+	if (microtime(true) - $start > 0.5) {
 		break;
 	}
 }
@@ -34,9 +33,6 @@ while (1) {
 echo "Done\n";
 ?>
 --EXPECTF--
-Warning: gmp_random_bits() expects exactly 1 parameter, 0 given in %s on line %d
-NULL
-
 Warning: gmp_random_bits(): The number of bits must be positive in %s on line %d
 bool(false)
 

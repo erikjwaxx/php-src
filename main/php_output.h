@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | PHP Version 7                                                        |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1997-2015 The PHP Group                                |
+   | Copyright (c) The PHP Group                                          |
    +----------------------------------------------------------------------+
    | This source file is subject to version 3.01 of the PHP license,      |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -15,8 +15,6 @@
    | Author: Michael Wallner <mike@php.net>                               |
    +----------------------------------------------------------------------+
 */
-
-/* $Id$ */
 
 #ifndef PHP_OUTPUT_H
 #define PHP_OUTPUT_H
@@ -94,8 +92,8 @@ typedef struct _php_output_buffer {
 	char *data;
 	size_t size;
 	size_t used;
-	uint free:1;
-	uint _res:31;
+	uint32_t free:1;
+	uint32_t _reserved:31;
 } php_output_buffer;
 
 typedef struct _php_output_context {
@@ -103,9 +101,6 @@ typedef struct _php_output_context {
 	php_output_buffer in;
 	php_output_buffer out;
 } php_output_context;
-
-/* XXX remove this after TLS branch merge */
-#define PHP_OUTPUT_TSRMLS(ctx)
 
 /* old-style, stateless callback */
 typedef void (*php_output_handler_func_t)(char *output, size_t output_len, char **handled_output, size_t *handled_output_len, int mode);
@@ -149,7 +144,7 @@ ZEND_BEGIN_MODULE_GLOBALS(output)
 	int flags;
 ZEND_END_MODULE_GLOBALS(output)
 
-PHPAPI ZEND_EXTERN_MODULE_GLOBALS(output);
+PHPAPI ZEND_EXTERN_MODULE_GLOBALS(output)
 
 /* there should not be a need to use OG() from outside of output.c */
 #ifdef ZTS
@@ -162,8 +157,8 @@ PHPAPI ZEND_EXTERN_MODULE_GLOBALS(output);
 #define PHPWRITE(str, str_len)		php_output_write((str), (str_len))
 #define PHPWRITE_H(str, str_len)	php_output_write_unbuffered((str), (str_len))
 
-#define PUTC(c)						(php_output_write((const char *) &(c), 1), (c))
-#define PUTC_H(c)					(php_output_write_unbuffered((const char *) &(c), 1), (c))
+#define PUTC(c)						php_output_write((const char *) &(c), 1)
+#define PUTC_H(c)					php_output_write_unbuffered((const char *) &(c), 1)
 
 #define PUTS(str)					do {				\
 	const char *__str = (str);							\
@@ -267,12 +262,3 @@ PHP_FUNCTION(output_add_rewrite_var);
 PHP_FUNCTION(output_reset_rewrite_vars);
 
 #endif
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: sw=4 ts=4 fdm=marker
- * vim<600: sw=4 ts=4
- */

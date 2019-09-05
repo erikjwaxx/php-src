@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | PHP Version 7                                                        |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1997-2015 The PHP Group                                |
+   | Copyright (c) The PHP Group                                          |
    +----------------------------------------------------------------------+
    | This source file is subject to version 3.01 of the PHP license,      |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -15,8 +15,6 @@
    | Author: Wez Furlong <wez@thebrainroom.com>                           |
    +----------------------------------------------------------------------+
  */
-
-/* $Id$ */
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -44,10 +42,10 @@ static void safe_array_from_zval(VARIANT *v, zval *z, int codepage)
 	zval *item;
 
 	/* find the largest array index, and assert that all keys are integers */
-	zend_hash_internal_pointer_reset_ex(HASH_OF(z), &pos);
-	for (;; zend_hash_move_forward_ex(HASH_OF(z), &pos)) {
+	zend_hash_internal_pointer_reset_ex(Z_ARRVAL_P(z), &pos);
+	for (;; zend_hash_move_forward_ex(Z_ARRVAL_P(z), &pos)) {
 
-		keytype = zend_hash_get_current_key_ex(HASH_OF(z), &strindex, &intindex, &pos);
+		keytype = zend_hash_get_current_key_ex(Z_ARRVAL_P(z), &strindex, &intindex, &pos);
 
 		if (HASH_KEY_IS_STRING == keytype) {
 			goto bogus;
@@ -61,7 +59,7 @@ static void safe_array_from_zval(VARIANT *v, zval *z, int codepage)
 
 	/* allocate the structure */
 	bound.lLbound = 0;
-	bound.cElements = zend_hash_num_elements(HASH_OF(z));
+	bound.cElements = zend_hash_num_elements(Z_ARRVAL_P(z));
 	sa = SafeArrayCreate(VT_VARIANT, 1, &bound);
 
 	/* get a lock on the array itself */
@@ -69,12 +67,12 @@ static void safe_array_from_zval(VARIANT *v, zval *z, int codepage)
 	va = (VARIANT*)sa->pvData;
 
 	/* now fill it in */
-	zend_hash_internal_pointer_reset_ex(HASH_OF(z), &pos);
-	for (;; zend_hash_move_forward_ex(HASH_OF(z), &pos)) {
-		if (NULL == (item = zend_hash_get_current_data_ex(HASH_OF(z), &pos))) {
+	zend_hash_internal_pointer_reset_ex(Z_ARRVAL_P(z), &pos);
+	for (;; zend_hash_move_forward_ex(Z_ARRVAL_P(z), &pos)) {
+		if (NULL == (item = zend_hash_get_current_data_ex(Z_ARRVAL_P(z), &pos))) {
 			break;
 		}
-		zend_hash_get_current_key_ex(HASH_OF(z), &strindex, &intindex, &pos);
+		zend_hash_get_current_key_ex(Z_ARRVAL_P(z), &strindex, &intindex, &pos);
 		php_com_variant_from_zval(&va[intindex], item, codepage);
 	}
 
@@ -100,7 +98,12 @@ PHP_COM_DOTNET_API void php_com_variant_from_zval(VARIANT *v, zval *z, int codep
 {
 	OLECHAR *olestring;
 	php_com_dotnet_object *obj;
-	zend_uchar ztype = (z == NULL ? IS_NULL : Z_TYPE_P(z));
+	zend_uchar ztype = IS_NULL;
+
+	if (z) {
+		ZVAL_DEREF(z);
+		ztype = Z_TYPE_P(z);
+	}
 
 	switch (ztype) {
 		case IS_NULL:
@@ -171,7 +174,6 @@ PHP_COM_DOTNET_API void php_com_variant_from_zval(VARIANT *v, zval *z, int codep
 			break;
 
 		case IS_RESOURCE:
-		case IS_CONSTANT:
 		case IS_CONSTANT_AST:
 		default:
 			V_VT(v) = VT_NULL;
@@ -450,7 +452,6 @@ PHP_FUNCTION(com_variant_create_instance)
 
 	if (FAILURE == zend_parse_parameters(ZEND_NUM_ARGS(),
 		"z!|ll", &zvalue, &vt, &codepage)) {
-			php_com_throw_exception(E_INVALIDARG, "Invalid arguments");
 			return;
 	}
 
@@ -488,7 +489,7 @@ PHP_FUNCTION(com_variant_create_instance)
 
 				werr = php_win32_error_to_msg(res);
 				spprintf(&msg, 0, "Variant type conversion failed: %s", werr);
-				LocalFree(werr);
+				php_win32_error_msg_free(werr);
 
 				php_com_throw_exception(res, msg);
 				efree(msg);
@@ -1007,6 +1008,13 @@ PHP_FUNCTION(variant_date_from_timestamp)
 	tzset();
 	ttstamp = timestamp;
 	tmv = localtime(&ttstamp);
+
+	/* Invalid after 23:59:59, December 31, 3000, UTC */
+	if (!tmv) {
+		php_error_docref(NULL, E_WARNING, "Invalid timestamp " ZEND_LONG_FMT, timestamp);
+		RETURN_FALSE;
+	}
+
 	memset(&systime, 0, sizeof(systime));
 
 	systime.wDay = tmv->tm_mday;
@@ -1069,7 +1077,7 @@ PHP_FUNCTION(variant_set_type)
 
 		werr = php_win32_error_to_msg(res);
 		spprintf(&msg, 0, "Variant type conversion failed: %s", werr);
-		LocalFree(werr);
+		php_win32_error_msg_free(werr);
 
 		php_com_throw_exception(res, msg);
 		efree(msg);
@@ -1103,7 +1111,7 @@ PHP_FUNCTION(variant_cast)
 
 		werr = php_win32_error_to_msg(res);
 		spprintf(&msg, 0, "Variant type conversion failed: %s", werr);
-		LocalFree(werr);
+		php_win32_error_msg_free(werr);
 
 		php_com_throw_exception(res, msg);
 		efree(msg);
@@ -1112,4 +1120,3 @@ PHP_FUNCTION(variant_cast)
 	VariantClear(&vres);
 }
 /* }}} */
-

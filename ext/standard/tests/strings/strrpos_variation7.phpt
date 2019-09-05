@@ -7,7 +7,7 @@ Test strrpos() function : usage variations - empty heredoc string for 'haystack'
  * Source code: ext/standard/string.c
 */
 
-/* Test strrpos() function by passing empty heredoc string for haystack 
+/* Test strrpos() function by passing empty heredoc string for haystack
  *  and with various needles & offsets
 */
 
@@ -25,8 +25,10 @@ echo "*** Done ***";
 --EXPECTF--
 *** Testing strrpos() function: with heredoc strings ***
 -- With empty heredoc string --
+int(0)
+
+Warning: strrpos(): Offset not contained in string in %s on line %d
 bool(false)
-bool(false)
-bool(false)
-bool(false)
+int(0)
+int(0)
 *** Done ***

@@ -3,7 +3,7 @@ Test debug_zval_dump() function : usage variations
 --FILE--
 <?php
 /* Prototype: void debug_zval_dump ( mixed $variable );
-   Description: Dumps a string representation of an internal zend value 
+   Description: Dumps a string representation of an internal zend value
                 to output.
 */
 
@@ -49,7 +49,7 @@ debug_zval_dump($ref_first_var);
 echo "\n-- Value of \$first_var --\n";
 debug_zval_dump($first_var);
 
-unset($ref_first_var); 
+unset($ref_first_var);
 
 /* dump value and reference count of $first_var, $ref_first_var
    here $ref_first_var is unset */
@@ -71,7 +71,7 @@ debug_zval_dump($var_3);
 
 /* unsetting $var_3 */
 unset($var_3);
-echo "\n-- Value of \$var_3: (after unsetting var_3) --\n"; 
+echo "\n-- Value of \$var_3: (after unsetting var_3) --\n";
 debug_zval_dump($var_3);
 echo "\n-- Value of \$var_2: --\n";
 debug_zval_dump($var_2);
@@ -94,7 +94,7 @@ $misc_values = array (
   /* nulls */
   NULL,
   null,
-  
+
   /* unset variable */
   @$unset_var,
 
@@ -102,7 +102,7 @@ $misc_values = array (
   @$undef_var,
 
  /* mixed types */
-  @TRUE123,
+  "TRUE123",
   "123string",
   "string123",
   "NULLstring"
@@ -118,33 +118,32 @@ foreach( $misc_values as $value ) {
 
 echo "Done\n";
 ?>
-
 --EXPECTF--
 *** Testing debug_zval_dump() on functions ***
 --- Variation 1: global variable inside a function ---
 
 -- Value of global variable, before calling dump_globalvar() --
-long(10)
+int(10)
 
 -- Value of local variable inside dump_globalvar() --
-long(10)
+int(10)
 
 -- Value of global variable inside dump_globalvar() --
-long(10)
+int(10)
 
 -- Value of global variable, after exiting dump_globalvar() --
-long(10)
+int(10)
 
 --- Variation 2: one variable references another ---
 
 -- Value of $first_var: --
-long(10)
+int(10)
 
 -- Value of $ref_first_var --
 NULL
 
 -- Value of $first_var --
-long(10)
+int(10)
 
 -- Value of $ref_first_var --
 
@@ -152,18 +151,18 @@ Notice: Undefined variable: ref_first_var in %s on line %d
 NULL
 
 -- Value of $first_var --
-long(10)
+int(10)
 
 --- Variation 3: multiple references of variables ---
 
 -- Value of $var_1: (before referencing) --
-long(10)
+int(10)
 
 -- Value of $var_2: (referencing var_1) --
-long(10)
+int(10)
 
 -- Value of $var_3: (referencing var_2) --
-long(10)
+int(10)
 
 -- Value of $var_3: (after unsetting var_3) --
 
@@ -171,10 +170,10 @@ Notice: Undefined variable: var_3 in %s on line %d
 NULL
 
 -- Value of $var_2: --
-long(10)
+int(10)
 
 -- Value of $var_3: --
-long(10)
+int(10)
 
 -- Value of $var_1: (after unsetting variable_1) --
 
@@ -182,7 +181,7 @@ Notice: Undefined variable: var_1 in %s on line %d
 NULL
 
 -- Value of $var_2: --
-long(10)
+int(10)
 
 *** Testing debug_zval_dump() on miscelleneous input arguments ***
 -- Iteration 1 --

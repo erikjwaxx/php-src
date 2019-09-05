@@ -1,7 +1,7 @@
 --TEST--
 gzfile(), gzreadfile()
 --SKIPIF--
-<?php /* $Id$ */
+<?php
 if (!extension_loaded("zlib")) print "skip"; ?>
 --FILE--
 <?php
@@ -25,7 +25,7 @@ blah blah blah blah blah blah blah
 
 EOD;
 
-$filename = tempnam("/tmp", "phpt");
+$filename = tempnam(sys_get_temp_dir(), "phpt");
 
 $fp = gzopen($filename, "wb");
 gzwrite($fp, $original);

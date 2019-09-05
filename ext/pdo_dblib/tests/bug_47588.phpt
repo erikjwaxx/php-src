@@ -3,11 +3,11 @@ PDO_DBLIB: Quoted field names
 --SKIPIF--
 <?php
 if (!extension_loaded('pdo_dblib')) die('skip not loaded');
-require dirname(__FILE__) . '/config.inc';
+require __DIR__ . '/config.inc';
 ?>
 --FILE--
 <?php
-require dirname(__FILE__) . '/config.inc';
+require __DIR__ . '/config.inc';
 
 $db->query('CREATE TABLE "Test Table" ("My Field" int, "Another Field" varchar(32) not null default \'test_string\')');
 $db->query('INSERT INTO "Test Table" ("My Field") values(1)');
@@ -23,21 +23,21 @@ array(3) {
   [0]=>
   array(2) {
     ["My Field"]=>
-    string(1) "1"
+    int(1)
     ["Another Field"]=>
     string(11) "test_string"
   }
   [1]=>
   array(2) {
     ["My Field"]=>
-    string(1) "2"
+    int(2)
     ["Another Field"]=>
     string(11) "test_string"
   }
   [2]=>
   array(2) {
     ["My Field"]=>
-    string(1) "3"
+    int(3)
     ["Another Field"]=>
     string(11) "test_string"
   }

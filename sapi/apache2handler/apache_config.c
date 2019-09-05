@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | PHP Version 7                                                        |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1997-2015 The PHP Group                                |
+   | Copyright (c) The PHP Group                                          |
    +----------------------------------------------------------------------+
    | This source file is subject to version 3.01 of the PHP license,      |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -15,8 +15,6 @@
    | Author: Sascha Schumann <sascha@schumann.cx>                         |
    +----------------------------------------------------------------------+
  */
-
-/* $Id$ */
 
 #define ZEND_INCLUDE_FULL_WINDOWS_HEADERS
 
@@ -128,26 +126,50 @@ static zend_bool should_overwrite_per_dir_entry(HashTable *target_ht, zval *zv, 
 
 	if (new_per_dir_entry->status >= orig_per_dir_entry->status) {
 		/* use new entry */
-		phpapdebug((stderr, "ADDING/OVERWRITING %s (%d vs. %d)\n", hash_key->arKey, new_per_dir_entry->status, orig_per_dir_entry->status));
+		phpapdebug((stderr, "ADDING/OVERWRITING %s (%d vs. %d)\n", ZSTR_VAL(hash_key->key), new_per_dir_entry->status, orig_per_dir_entry->status));
 		return 1;
 	} else {
 		return 0;
 	}
 }
 
+void config_entry_ctor(zval *zv)
+{
+	php_dir_entry *pe = (php_dir_entry*)Z_PTR_P(zv);
+	php_dir_entry *npe = malloc(sizeof(php_dir_entry));
+
+	memcpy(npe, pe, sizeof(php_dir_entry));
+	ZVAL_PTR(zv, npe);
+}
 
 void *merge_php_config(apr_pool_t *p, void *base_conf, void *new_conf)
 {
 	php_conf_rec *d = base_conf, *e = new_conf, *n = NULL;
+#ifdef ZTS
+	zend_string *str;
+	zval *data;
+#endif
 
 	n = create_php_config(p, "merge_php_config");
 	/* copy old config */
-	zend_hash_copy(&n->config, &d->config, NULL);
-//???	zend_hash_copy(&n->config, &d->config, NULL, NULL, sizeof(php_dir_entry));
+#ifdef ZTS
+	ZEND_HASH_FOREACH_STR_KEY_VAL(&d->config, str, data) {
+		zend_string *key;
+		zval *new_entry;
+
+		/* Avoid sharing the non interned string among threads. */
+		key = zend_string_dup(str, 1);
+
+		new_entry = zend_hash_add(&n->config, key, data);
+
+		config_entry_ctor(new_entry);
+	} ZEND_HASH_FOREACH_END();
+#else
+	zend_hash_copy(&n->config, &d->config, config_entry_ctor);
+#endif
 	/* merge new config */
 	phpapdebug((stderr, "Merge dir (%p)+(%p)=(%p)\n", base_conf, new_conf, n));
-	zend_hash_merge_ex(&n->config, &e->config, NULL, should_overwrite_per_dir_entry, NULL);
-//???	zend_hash_merge_ex(&n->config, &e->config, NULL, sizeof(php_dir_entry), (merge_checker_func_t) should_overwrite_per_dir_entry, NULL);
+	zend_hash_merge_ex(&n->config, &e->config, config_entry_ctor, should_overwrite_per_dir_entry, NULL);
 	return n;
 }
 
@@ -170,7 +192,7 @@ void apply_config(void *dummy)
 	php_dir_entry *data;
 
 	ZEND_HASH_FOREACH_STR_KEY_PTR(&d->config, str, data) {
-		phpapdebug((stderr, "APPLYING (%s)(%s)\n", str, data->value));
+		phpapdebug((stderr, "APPLYING (%s)(%s)\n", ZSTR_VAL(str), data->value));
 		if (zend_alter_ini_entry_chars(str, data->value, data->value_len, data->status, data->htaccess?PHP_INI_STAGE_HTACCESS:PHP_INI_STAGE_ACTIVATE) == FAILURE) {
 			phpapdebug((stderr, "..FAILED\n"));
 		}
@@ -197,21 +219,17 @@ static apr_status_t destroy_php_config(void *data)
 	return APR_SUCCESS;
 }
 
+static void config_entry_dtor(zval *zv)
+{
+	free((php_dir_entry*)Z_PTR_P(zv));
+}
+
 void *create_php_config(apr_pool_t *p, char *dummy)
 {
 	php_conf_rec *newx = (php_conf_rec *) apr_pcalloc(p, sizeof(*newx));
 
 	phpapdebug((stderr, "Creating new config (%p) for %s\n", newx, dummy));
-	zend_hash_init(&newx->config, 0, NULL, NULL, 1);
+	zend_hash_init(&newx->config, 0, NULL, config_entry_dtor, 1);
 	apr_pool_cleanup_register(p, newx, destroy_php_config, apr_pool_cleanup_null);
 	return (void *) newx;
 }
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: sw=4 ts=4 fdm=marker
- * vim<600: sw=4 ts=4
- */

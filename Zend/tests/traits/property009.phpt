@@ -2,7 +2,6 @@
 Handling of public fields with traits needs to have same semantics as with normal inheritance, however, we do add strict warnings since it is easier to run into something unexpeted with changing traits.
 --FILE--
 <?php
-error_reporting(E_ALL | E_STRICT);
 
 class BaseWithPropA {
   public $hello = 0;
@@ -41,10 +40,7 @@ $b = new SubclassB;
 var_dump($b);
 
 ?>
---EXPECTF--
-Strict Standards: BaseWithPropA and AHelloProperty define the same property ($hello) in the composition of SubclassA. This might be incompatible, to improve maintainability consider using accessor methods in traits instead. Class was composed in %s on line %d
-
-Strict Standards: BaseWithTPropB and AHelloProperty define the same property ($hello) in the composition of SubclassB. This might be incompatible, to improve maintainability consider using accessor methods in traits instead. Class was composed in %s on line %d
+--EXPECT--
 object(SubclassClassicInheritance)#1 (1) {
   ["hello"]=>
   int(0)

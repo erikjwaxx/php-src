@@ -4,16 +4,18 @@ Testing wrong parameter resource in imageantialias() of GD library
 Guilherme Blanco <guilhermeblanco [at] hotmail [dot] com>
 #testfest PHPSP on 2009-06-20
 --SKIPIF--
-<?php 
+<?php
 if (!extension_loaded("gd")) die("skip GD not present");
-if (!GD_BUNDLED) die("skip requires bundled GD library\n");
 ?>
 --FILE--
 <?php
 $image = tmpfile();
 
-var_dump(imageantialias($image, true));
+try {
+    var_dump(imageantialias($image, true));
+} catch (TypeError $e) {
+    echo $e->getMessage(), "\n";
+}
 ?>
---EXPECTF--
-Warning: imageantialias(): supplied resource is not a valid Image resource in %s on line %d
-bool(false)
+--EXPECT--
+imageantialias(): supplied resource is not a valid Image resource

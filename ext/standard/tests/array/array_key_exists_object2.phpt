@@ -3,7 +3,7 @@ Test array_key_exists() function : object functionality - different visibilities
 --FILE--
 <?php
 /* Prototype  : bool array_key_exists(mixed $key, array $search)
- * Description: Checks if the given key or index exists in the array 
+ * Description: Checks if the given key or index exists in the array
  * Source code: ext/standard/array.c
  * Alias to functions: key_exists
  */
@@ -18,7 +18,7 @@ class myClass {
 	public $var1;
 	protected $var2;
 	private $var3;
-	
+
 	function __construct($a, $b, $c = null) {
 		$this->var1 = $a;
 		$this->var2 = $b;
@@ -48,37 +48,44 @@ var_dump($class2);
 
 echo "Done";
 ?>
-
 --EXPECTF--
 *** Testing array_key_exists() : object functionality ***
 
 -- Do not assign a value to $class1->var3 --
 $key = var1:
+
+Deprecated: array_key_exists(): Using array_key_exists() on objects is deprecated. Use isset() or property_exists() instead in %s on line %d
 bool(true)
 $key = var2:
+
+Deprecated: array_key_exists(): Using array_key_exists() on objects is deprecated. Use isset() or property_exists() instead in %s on line %d
 bool(false)
 $key = var3:
+
+Deprecated: array_key_exists(): Using array_key_exists() on objects is deprecated. Use isset() or property_exists() instead in %s on line %d
 bool(false)
 $class1:
 object(myClass)#1 (3) {
-  [%b|u%"var1"]=>
-  %unicode|string%(1) "a"
-  [%b|u%"var2":protected]=>
-  %unicode|string%(1) "b"
-  [%b|u%"var3":%b|u%"myClass":private]=>
+  ["var1"]=>
+  string(1) "a"
+  ["var2":protected]=>
+  string(1) "b"
+  ["var3":"myClass":private]=>
   NULL
 }
 
 -- Assign a value to $class2->var3 --
 $key = var3:
+
+Deprecated: array_key_exists(): Using array_key_exists() on objects is deprecated. Use isset() or property_exists() instead in %s on line %d
 bool(false)
 $class2:
 object(myClass)#2 (3) {
-  [%b|u%"var1"]=>
-  %unicode|string%(1) "x"
-  [%b|u%"var2":protected]=>
-  %unicode|string%(1) "y"
-  [%b|u%"var3":%b|u%"myClass":private]=>
-  %unicode|string%(1) "z"
+  ["var1"]=>
+  string(1) "x"
+  ["var2":protected]=>
+  string(1) "y"
+  ["var3":"myClass":private]=>
+  string(1) "z"
 }
 Done

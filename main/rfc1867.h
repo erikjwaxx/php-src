@@ -2,7 +2,7 @@
   +----------------------------------------------------------------------+
   | PHP Version 7                                                        |
   +----------------------------------------------------------------------+
-  | Copyright (c) 1997-2015 The PHP Group                                |
+  | Copyright (c) The PHP Group                                          |
   +----------------------------------------------------------------------+
   | This source file is subject to version 3.01 of the PHP license,      |
   | that is bundled with this package in the file LICENSE, and is        |
@@ -15,8 +15,6 @@
   | Author:                                                              |
   +----------------------------------------------------------------------+
 */
-
-/* $Id$ */
 
 #ifndef RFC1867_H
 #define RFC1867_H
@@ -76,7 +74,7 @@ typedef char* (*php_rfc1867_basename_t)(const zend_encoding *encoding, char *str
 
 SAPI_API SAPI_POST_HANDLER_FUNC(rfc1867_post_handler);
 
-void destroy_uploaded_files_hash(void);
+PHPAPI void destroy_uploaded_files_hash(void);
 void php_rfc1867_register_constants(void);
 extern PHPAPI int (*php_rfc1867_callback)(unsigned int event, void *event_data, void **extra);
 

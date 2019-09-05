@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | PHP Version 7                                                        |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1997-2015 The PHP Group                                |
+   | Copyright (c) The PHP Group                                          |
    +----------------------------------------------------------------------+
    | This source file is subject to version 3.01 of the PHP license,      |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -23,11 +23,11 @@ static int phpdbg_is_auto_global(char *name, int len) {
 	int ret;
 	zend_string *str = zend_string_init(name, len, 0);
 	ret = zend_is_auto_global(str);
-	efree(str);
+	zend_string_free(str);
 	return ret;
 }
 
-PHPDBG_API void phpdbg_webdata_compress(char **msg, int *len) {
+PHPDBG_API void phpdbg_webdata_compress(char **msg, size_t *len) {
 	zval array;
 	HashTable *ht;
 	zval zv[9] = {{{0}}};
@@ -167,9 +167,9 @@ PHPDBG_API void phpdbg_webdata_compress(char **msg, int *len) {
 		PHP_VAR_SERIALIZE_INIT(var_hash);
 		php_var_serialize(&buf, &array, &var_hash);
 		PHP_VAR_SERIALIZE_DESTROY(var_hash);
-		*msg = buf.s->val;
-		*len = buf.s->len;
+		*msg = ZSTR_VAL(buf.s);
+		*len = ZSTR_LEN(buf.s);
 	}
 
-	zval_dtor(&array);
+	zend_array_destroy(Z_ARR(array));
 }

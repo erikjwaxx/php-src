@@ -7,14 +7,12 @@ require_once('skipifemb.inc');
 require_once('connect.inc');
 
 /*
-Let's not deal with cross-version issues in the EXPECTF/UEXPECTF.
+Let's not deal with cross-version issues in the EXPECTF section.
 Most of the things which we test are covered by mysqli_class_*_interface.phpt.
 Those tests go into the details and are aimed to be a development tool, no more.
 */
 if (!$IS_MYSQLND)
-	die("skip Test has been written for the latest version of mysqlnd only");
-if ($MYSQLND_VERSION < 50004)
-	die("skip Test requires mysqlnd Revision 5.0.4 or newer");
+	die("skip Test has been written for mysqlnd only");
 
 ?>
 --FILE--
@@ -24,7 +22,7 @@ if ($MYSQLND_VERSION < 50004)
 	inspectClass($class);
 	print "done!\n";
 ?>
---EXPECTF--
+--EXPECT--
 Inspecting class 'mysqli'
 isInternal: yes
 isUserDefined: no
@@ -37,7 +35,7 @@ Modifiers: '0'
 Parent Class: ''
 Extension: 'mysqli'
 
-Inspecting method 'mysqli'
+Inspecting method '__construct'
 isFinal: no
 isAbstract: no
 isPublic: yes
@@ -49,46 +47,104 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 8448
+Modifiers: 1
 Number of Parameters: 6
 Number of Required Parameters: 0
 
-Inspecting parameter 'host' of method 'mysqli'
+Inspecting parameter 'host' of method '__construct'
 isArray: no
 allowsNull: no
 isPassedByReference: no
 isOptional: yes
 isDefaultValueAvailable: no
 
-Inspecting parameter 'user' of method 'mysqli'
+Inspecting parameter 'user' of method '__construct'
 isArray: no
 allowsNull: no
 isPassedByReference: no
 isOptional: yes
 isDefaultValueAvailable: no
 
-Inspecting parameter 'password' of method 'mysqli'
+Inspecting parameter 'password' of method '__construct'
 isArray: no
 allowsNull: no
 isPassedByReference: no
 isOptional: yes
 isDefaultValueAvailable: no
 
-Inspecting parameter 'database' of method 'mysqli'
+Inspecting parameter 'database' of method '__construct'
 isArray: no
 allowsNull: no
 isPassedByReference: no
 isOptional: yes
 isDefaultValueAvailable: no
 
-Inspecting parameter 'port' of method 'mysqli'
+Inspecting parameter 'port' of method '__construct'
 isArray: no
 allowsNull: no
 isPassedByReference: no
 isOptional: yes
 isDefaultValueAvailable: no
 
-Inspecting parameter 'socket' of method 'mysqli'
+Inspecting parameter 'socket' of method '__construct'
+isArray: no
+allowsNull: no
+isPassedByReference: no
+isOptional: yes
+isDefaultValueAvailable: no
+
+Inspecting method '__construct'
+isFinal: no
+isAbstract: no
+isPublic: yes
+isPrivate: no
+isProtected: no
+isStatic: no
+isConstructor: yes
+isDestructor: no
+isInternal: yes
+isUserDefined: no
+returnsReference: no
+Modifiers: 1
+Number of Parameters: 6
+Number of Required Parameters: 0
+
+Inspecting parameter 'host' of method '__construct'
+isArray: no
+allowsNull: no
+isPassedByReference: no
+isOptional: yes
+isDefaultValueAvailable: no
+
+Inspecting parameter 'user' of method '__construct'
+isArray: no
+allowsNull: no
+isPassedByReference: no
+isOptional: yes
+isDefaultValueAvailable: no
+
+Inspecting parameter 'password' of method '__construct'
+isArray: no
+allowsNull: no
+isPassedByReference: no
+isOptional: yes
+isDefaultValueAvailable: no
+
+Inspecting parameter 'database' of method '__construct'
+isArray: no
+allowsNull: no
+isPassedByReference: no
+isOptional: yes
+isDefaultValueAvailable: no
+
+Inspecting parameter 'port' of method '__construct'
+isArray: no
+allowsNull: no
+isPassedByReference: no
+isOptional: yes
+isDefaultValueAvailable: no
+
+Inspecting parameter 'socket' of method '__construct'
 isArray: no
 allowsNull: no
 isPassedByReference: no
@@ -107,7 +163,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 1
 Number of Required Parameters: 1
 
@@ -130,7 +186,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 2
 Number of Required Parameters: 0
 
@@ -160,7 +216,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 3
 Number of Required Parameters: 3
 
@@ -197,7 +253,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 0
 Number of Required Parameters: 0
 
@@ -213,7 +269,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 0
 Number of Required Parameters: 0
 
@@ -229,7 +285,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 2
 Number of Required Parameters: 0
 
@@ -259,7 +315,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 6
 Number of Required Parameters: 0
 
@@ -317,7 +373,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 1
 Number of Required Parameters: 1
 
@@ -340,7 +396,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 0
 Number of Required Parameters: 0
 
@@ -356,7 +412,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 1
 Number of Required Parameters: 1
 
@@ -379,7 +435,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 0
 Number of Required Parameters: 0
 
@@ -395,7 +451,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 0
 Number of Required Parameters: 0
 
@@ -411,7 +467,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 0
 Number of Required Parameters: 0
 
@@ -427,7 +483,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 0
 Number of Required Parameters: 0
 
@@ -443,7 +499,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 0
 Number of Required Parameters: 0
 
@@ -459,7 +515,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 0
 Number of Required Parameters: 0
 
@@ -475,7 +531,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 1
 Number of Required Parameters: 1
 
@@ -498,7 +554,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 0
 Number of Required Parameters: 0
 
@@ -514,7 +570,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 1
 Number of Required Parameters: 1
 
@@ -523,64 +579,6 @@ isArray: no
 allowsNull: no
 isPassedByReference: no
 isOptional: no
-isDefaultValueAvailable: no
-
-Inspecting method 'mysqli'
-isFinal: no
-isAbstract: no
-isPublic: yes
-isPrivate: no
-isProtected: no
-isStatic: no
-isConstructor: yes
-isDestructor: no
-isInternal: yes
-isUserDefined: no
-returnsReference: no
-Modifiers: 8448
-Number of Parameters: 6
-Number of Required Parameters: 0
-
-Inspecting parameter 'host' of method 'mysqli'
-isArray: no
-allowsNull: no
-isPassedByReference: no
-isOptional: yes
-isDefaultValueAvailable: no
-
-Inspecting parameter 'user' of method 'mysqli'
-isArray: no
-allowsNull: no
-isPassedByReference: no
-isOptional: yes
-isDefaultValueAvailable: no
-
-Inspecting parameter 'password' of method 'mysqli'
-isArray: no
-allowsNull: no
-isPassedByReference: no
-isOptional: yes
-isDefaultValueAvailable: no
-
-Inspecting parameter 'database' of method 'mysqli'
-isArray: no
-allowsNull: no
-isPassedByReference: no
-isOptional: yes
-isDefaultValueAvailable: no
-
-Inspecting parameter 'port' of method 'mysqli'
-isArray: no
-allowsNull: no
-isPassedByReference: no
-isOptional: yes
-isDefaultValueAvailable: no
-
-Inspecting parameter 'socket' of method 'mysqli'
-isArray: no
-allowsNull: no
-isPassedByReference: no
-isOptional: yes
 isDefaultValueAvailable: no
 
 Inspecting method 'next_result'
@@ -595,7 +593,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 0
 Number of Required Parameters: 0
 
@@ -611,7 +609,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 2
 Number of Required Parameters: 2
 
@@ -641,7 +639,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 0
 Number of Required Parameters: 0
 
@@ -657,7 +655,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 268435713
+Modifiers: 17
 Number of Parameters: 5
 Number of Required Parameters: 4
 
@@ -708,7 +706,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 1
 Number of Required Parameters: 1
 
@@ -731,8 +729,8 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
-Number of Parameters: 1
+Modifiers: 1
+Number of Parameters: 2
 Number of Required Parameters: 1
 
 Inspecting parameter 'query' of method 'query'
@@ -740,6 +738,13 @@ isArray: no
 allowsNull: no
 isPassedByReference: no
 isOptional: no
+isDefaultValueAvailable: no
+
+Inspecting parameter 'resultmode' of method 'query'
+isArray: no
+allowsNull: no
+isPassedByReference: no
+isOptional: yes
 isDefaultValueAvailable: no
 
 Inspecting method 'real_connect'
@@ -754,7 +759,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 7
 Number of Required Parameters: 0
 
@@ -819,7 +824,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 1
 Number of Required Parameters: 1
 
@@ -842,7 +847,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 1
 Number of Required Parameters: 1
 
@@ -865,7 +870,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 0
 Number of Required Parameters: 0
 
@@ -881,7 +886,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 1
 Number of Required Parameters: 1
 
@@ -904,7 +909,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 1
 Number of Required Parameters: 1
 
@@ -927,7 +932,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 2
 Number of Required Parameters: 0
 
@@ -957,7 +962,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 1
 Number of Required Parameters: 1
 
@@ -980,7 +985,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 1
 Number of Required Parameters: 1
 
@@ -1003,7 +1008,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 1
 Number of Required Parameters: 1
 
@@ -1026,7 +1031,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 2
 Number of Required Parameters: 2
 
@@ -1056,7 +1061,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 5
 Number of Required Parameters: 5
 
@@ -1107,7 +1112,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 0
 Number of Required Parameters: 0
 
@@ -1123,7 +1128,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 0
 Number of Required Parameters: 0
 
@@ -1139,7 +1144,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 1
 Number of Required Parameters: 0
 
@@ -1162,7 +1167,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 0
 Number of Required Parameters: 0
 
@@ -1178,7 +1183,7 @@ isDestructor: no
 isInternal: yes
 isUserDefined: no
 returnsReference: no
-Modifiers: 256
+Modifiers: 1
 Number of Parameters: 0
 Number of Required Parameters: 0
 
@@ -1188,7 +1193,7 @@ isPrivate: no
 isProtected: no
 isStatic: no
 isDefault: yes
-Modifiers: 256
+Modifiers: 1
 
 Inspecting property 'client_info'
 isPublic: yes
@@ -1196,7 +1201,7 @@ isPrivate: no
 isProtected: no
 isStatic: no
 isDefault: yes
-Modifiers: 256
+Modifiers: 1
 
 Inspecting property 'client_version'
 isPublic: yes
@@ -1204,7 +1209,7 @@ isPrivate: no
 isProtected: no
 isStatic: no
 isDefault: yes
-Modifiers: 256
+Modifiers: 1
 
 Inspecting property 'connect_errno'
 isPublic: yes
@@ -1212,7 +1217,7 @@ isPrivate: no
 isProtected: no
 isStatic: no
 isDefault: yes
-Modifiers: 256
+Modifiers: 1
 
 Inspecting property 'connect_error'
 isPublic: yes
@@ -1220,7 +1225,7 @@ isPrivate: no
 isProtected: no
 isStatic: no
 isDefault: yes
-Modifiers: 256
+Modifiers: 1
 
 Inspecting property 'errno'
 isPublic: yes
@@ -1228,7 +1233,7 @@ isPrivate: no
 isProtected: no
 isStatic: no
 isDefault: yes
-Modifiers: 256
+Modifiers: 1
 
 Inspecting property 'error'
 isPublic: yes
@@ -1236,7 +1241,7 @@ isPrivate: no
 isProtected: no
 isStatic: no
 isDefault: yes
-Modifiers: 256
+Modifiers: 1
 
 Inspecting property 'error_list'
 isPublic: yes
@@ -1244,7 +1249,7 @@ isPrivate: no
 isProtected: no
 isStatic: no
 isDefault: yes
-Modifiers: 256
+Modifiers: 1
 
 Inspecting property 'field_count'
 isPublic: yes
@@ -1252,7 +1257,7 @@ isPrivate: no
 isProtected: no
 isStatic: no
 isDefault: yes
-Modifiers: 256
+Modifiers: 1
 
 Inspecting property 'host_info'
 isPublic: yes
@@ -1260,7 +1265,7 @@ isPrivate: no
 isProtected: no
 isStatic: no
 isDefault: yes
-Modifiers: 256
+Modifiers: 1
 
 Inspecting property 'info'
 isPublic: yes
@@ -1268,7 +1273,7 @@ isPrivate: no
 isProtected: no
 isStatic: no
 isDefault: yes
-Modifiers: 256
+Modifiers: 1
 
 Inspecting property 'insert_id'
 isPublic: yes
@@ -1276,7 +1281,7 @@ isPrivate: no
 isProtected: no
 isStatic: no
 isDefault: yes
-Modifiers: 256
+Modifiers: 1
 
 Inspecting property 'protocol_version'
 isPublic: yes
@@ -1284,7 +1289,7 @@ isPrivate: no
 isProtected: no
 isStatic: no
 isDefault: yes
-Modifiers: 256
+Modifiers: 1
 
 Inspecting property 'server_info'
 isPublic: yes
@@ -1292,7 +1297,7 @@ isPrivate: no
 isProtected: no
 isStatic: no
 isDefault: yes
-Modifiers: 256
+Modifiers: 1
 
 Inspecting property 'server_version'
 isPublic: yes
@@ -1300,7 +1305,7 @@ isPrivate: no
 isProtected: no
 isStatic: no
 isDefault: yes
-Modifiers: 256
+Modifiers: 1
 
 Inspecting property 'sqlstate'
 isPublic: yes
@@ -1308,15 +1313,7 @@ isPrivate: no
 isProtected: no
 isStatic: no
 isDefault: yes
-Modifiers: 256
-
-Inspecting property 'stat'
-isPublic: yes
-isPrivate: no
-isProtected: no
-isStatic: no
-isDefault: yes
-Modifiers: 256
+Modifiers: 1
 
 Inspecting property 'thread_id'
 isPublic: yes
@@ -1324,7 +1321,7 @@ isPrivate: no
 isProtected: no
 isStatic: no
 isDefault: yes
-Modifiers: 256
+Modifiers: 1
 
 Inspecting property 'warning_count'
 isPublic: yes
@@ -1332,7 +1329,7 @@ isPrivate: no
 isProtected: no
 isStatic: no
 isDefault: yes
-Modifiers: 256
+Modifiers: 1
 Default property 'affected_rows'
 Default property 'client_info'
 Default property 'client_version'
@@ -1349,7 +1346,6 @@ Default property 'protocol_version'
 Default property 'server_info'
 Default property 'server_version'
 Default property 'sqlstate'
-Default property 'stat'
 Default property 'thread_id'
 Default property 'warning_count'
 done!

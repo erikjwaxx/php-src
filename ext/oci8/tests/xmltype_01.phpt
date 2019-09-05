@@ -1,15 +1,15 @@
 --TEST--
 Basic XMLType test
 --SKIPIF--
-<?php 
+<?php
 if (!extension_loaded("simplexml")) die("skip no simplexml extension");
 $target_dbs = array('oracledb' => true, 'timesten' => false);  // test runs on these DBs
-require(dirname(__FILE__).'/skipif.inc');
+require(__DIR__.'/skipif.inc');
 ?>
 --FILE--
 <?php
 
-require(dirname(__FILE__)."/connect.inc");
+require(__DIR__."/connect.inc");
 
 // Initialization
 
@@ -34,7 +34,7 @@ $stmtarray = array(
 		</Xt>'))"
 );
 
-oci8_test_sql_execute($c, $stmtarray);
+oci8_test_sql_execute($c, str_replace("\r", "", $stmtarray));
 
 function do_query($c)
 {

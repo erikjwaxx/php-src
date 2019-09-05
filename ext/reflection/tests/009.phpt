@@ -2,7 +2,6 @@
 ReflectionFunction basic tests
 --INI--
 opcache.save_comments=1
-opcache.load_comments=1
 --FILE--
 <?php
 
@@ -15,7 +14,7 @@ function test ($a, $b = 1, $c = "") {
 
 $func = new ReflectionFunction("test");
 
-var_dump($func->export("test"));
+echo $func;
 echo "--getName--\n";
 var_dump($func->getName());
 echo "--isInternal--\n";
@@ -48,7 +47,7 @@ var_dump($func->getNumberOfRequiredParameters());
 echo "Done\n";
 
 ?>
---EXPECTF--	
+--EXPECTF--
 /**
 hoho
 */
@@ -61,8 +60,6 @@ Function [ <user> function test ] {
     Parameter #2 [ <optional> $c = '' ]
   }
 }
-
-NULL
 --getName--
 string(4) "test"
 --isInternal--
@@ -76,7 +73,7 @@ int(6)
 --getEndline--
 int(8)
 --getDocComment--
-string(11) "/**
+string(%d) "/**
 hoho
 */"
 --getStaticVariables--

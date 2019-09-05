@@ -2,7 +2,7 @@
   +----------------------------------------------------------------------+
   | PHP Version 7                                                        |
   +----------------------------------------------------------------------+
-  | Copyright (c) 1997-2015 The PHP Group                                |
+  | Copyright (c) The PHP Group                                          |
   +----------------------------------------------------------------------+
   | This source file is subject to version 3.01 of the PHP license,      |
   | that is bundled with this package in the file LICENSE, and is        |
@@ -15,8 +15,6 @@
   | Author: Georg Richter <georg@php.net>                                |
             Andrey Hristov <andrey@php.net>                              |
   +----------------------------------------------------------------------+
-
-  $Id: php_mysqli_structs.h 302179 2010-08-13 09:57:04Z andrey $
 */
 
 #ifndef MYSQLI_FE_H
@@ -53,7 +51,6 @@ PHP_FUNCTION(mysqli_field_count);
 PHP_FUNCTION(mysqli_field_seek);
 PHP_FUNCTION(mysqli_field_tell);
 PHP_FUNCTION(mysqli_free_result);
-PHP_FUNCTION(mysqli_get_cache_stats);
 PHP_FUNCTION(mysqli_get_client_stats);
 PHP_FUNCTION(mysqli_get_connection_stats);
 PHP_FUNCTION(mysqli_get_charset);
@@ -68,6 +65,7 @@ PHP_FUNCTION(mysqli_get_warnings);
 PHP_FUNCTION(mysqli_info);
 PHP_FUNCTION(mysqli_insert_id);
 PHP_FUNCTION(mysqli_init);
+PHP_FUNCTION(mysqli_init_method);
 PHP_FUNCTION(mysqli_kill);
 PHP_FUNCTION(mysqli_link_construct);
 PHP_FUNCTION(mysqli_set_local_infile_default);
@@ -103,8 +101,6 @@ PHP_FUNCTION(mysqli_stmt_prepare);
 PHP_FUNCTION(mysqli_stmt_fetch);
 PHP_FUNCTION(mysqli_stmt_param_count);
 PHP_FUNCTION(mysqli_stmt_send_long_data);
-PHP_FUNCTION(mysqli_embedded_server_end);
-PHP_FUNCTION(mysqli_embedded_server_start);
 PHP_FUNCTION(mysqli_sqlstate);
 PHP_FUNCTION(mysqli_ssl_set);
 PHP_FUNCTION(mysqli_stat);
@@ -139,4 +135,3 @@ PHP_FUNCTION(mysqli_driver_construct);
 PHP_METHOD(mysqli_warning,__construct);
 
 #endif /* MYSQLI_FE_H */
-

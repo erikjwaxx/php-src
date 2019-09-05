@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | PHP Version 7                                                        |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1997-2015 The PHP Group                                |
+   | Copyright (c) The PHP Group                                          |
    +----------------------------------------------------------------------+
    | This source file is subject to version 3.01 of the PHP license,      |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -13,12 +13,10 @@
    | license@php.net so we can mail you a copy immediately.               |
    +----------------------------------------------------------------------+
    | Authors: Rasmus Lerdorf <rasmus@php.net>                             |
-   |          Zeev Suraski <zeev@zend.com>                                |
+   |          Zeev Suraski <zeev@php.net>                                 |
    |          Colin Viebrock <colin@viebrock.ca>                          |
    +----------------------------------------------------------------------+
 */
-
-/* $Id$ */
 
 #include "php.h"
 #include "php_ini.h"
@@ -41,13 +39,7 @@
 #include "php_string.h"
 
 #ifdef PHP_WIN32
-typedef void (WINAPI *PGNSI)(LPSYSTEM_INFO);
-typedef BOOL (WINAPI *PGPI)(DWORD, DWORD, DWORD, DWORD, PDWORD);
 # include "winver.h"
-
-# if _MSC_VER < 1300
-#  define OSVERSIONINFOEX php_win_OSVERSIONINFOEX
-# endif
 #endif
 
 #define SECTION(name)	if (!sapi_module.phpinfo_as_text) { \
@@ -62,19 +54,19 @@ PHPAPI extern char *php_ini_opened_path;
 PHPAPI extern char *php_ini_scanned_path;
 PHPAPI extern char *php_ini_scanned_files;
 
-static int php_info_print_html_esc(const char *str, size_t len) /* {{{ */
+static ZEND_COLD int php_info_print_html_esc(const char *str, size_t len) /* {{{ */
 {
 	size_t written;
 	zend_string *new_str;
 
 	new_str = php_escape_html_entities((unsigned char *) str, len, 0, ENT_QUOTES, "utf-8");
-	written = php_output_write(new_str->val, new_str->len);
+	written = php_output_write(ZSTR_VAL(new_str), ZSTR_LEN(new_str));
 	zend_string_free(new_str);
 	return written;
 }
 /* }}} */
 
-static int php_info_printf(const char *fmt, ...) /* {{{ */
+static ZEND_COLD int php_info_printf(const char *fmt, ...) /* {{{ */
 {
 	char *buf;
 	size_t len, written;
@@ -90,13 +82,13 @@ static int php_info_printf(const char *fmt, ...) /* {{{ */
 }
 /* }}} */
 
-static int php_info_print(const char *str) /* {{{ */
+static zend_always_inline int php_info_print(const char *str) /* {{{ */
 {
 	return php_output_write(str, strlen(str));
 }
 /* }}} */
 
-static void php_info_print_stream_hash(const char *name, HashTable *ht) /* {{{ */
+static ZEND_COLD void php_info_print_stream_hash(const char *name, HashTable *ht) /* {{{ */
 {
 	zend_string *key;
 
@@ -118,9 +110,9 @@ static void php_info_print_stream_hash(const char *name, HashTable *ht) /* {{{ *
 						php_info_print(", ");
 					}
 					if (!sapi_module.phpinfo_as_text) {
-						php_info_print_html_esc(key->val, key->len);
+						php_info_print_html_esc(ZSTR_VAL(key), ZSTR_LEN(key));
 					} else {
-						php_info_print(key->val);
+						php_info_print(ZSTR_VAL(key));
 					}
 				}
 			} ZEND_HASH_FOREACH_END();
@@ -139,14 +131,14 @@ static void php_info_print_stream_hash(const char *name, HashTable *ht) /* {{{ *
 }
 /* }}} */
 
-PHPAPI void php_info_print_module(zend_module_entry *zend_module) /* {{{ */
+PHPAPI ZEND_COLD void php_info_print_module(zend_module_entry *zend_module) /* {{{ */
 {
 	if (zend_module->info_func || zend_module->version) {
 		if (!sapi_module.phpinfo_as_text) {
 			zend_string *url_name = php_url_encode(zend_module->name, strlen(zend_module->name));
 
-			php_strtolower(url_name->val, url_name->len);
-			php_info_printf("<h2><a name=\"module_%s\">%s</a></h2>\n", url_name->val, zend_module->name);
+			php_strtolower(ZSTR_VAL(url_name), ZSTR_LEN(url_name));
+			php_info_printf("<h2><a name=\"module_%s\">%s</a></h2>\n", ZSTR_VAL(url_name), zend_module->name);
 
 			efree(url_name);
 		} else {
@@ -172,31 +164,11 @@ PHPAPI void php_info_print_module(zend_module_entry *zend_module) /* {{{ */
 }
 /* }}} */
 
-static int _display_module_info_func(zval *el) /* {{{ */
-{
-	zend_module_entry *module = (zend_module_entry*)Z_PTR_P(el);
-	if (module->info_func || module->version) {
-		php_info_print_module(module);
-	}
-	return ZEND_HASH_APPLY_KEEP;
-}
-/* }}} */
-
-static int _display_module_info_def(zval *el) /* {{{ */
-{
-	zend_module_entry *module = (zend_module_entry*)Z_PTR_P(el);
-	if (!module->info_func && !module->version) {
-		php_info_print_module(module);
-	}
-	return ZEND_HASH_APPLY_KEEP;
-}
-/* }}} */
-
 /* {{{ php_print_gpcse_array
  */
-static void php_print_gpcse_array(char *name, uint name_length)
+static ZEND_COLD void php_print_gpcse_array(char *name, uint32_t name_length)
 {
-	zval *data, *tmp, tmp2;
+	zval *data, *tmp;
 	zend_string *string_key;
 	zend_ulong num_key;
 	zend_string *key;
@@ -217,9 +189,9 @@ static void php_print_gpcse_array(char *name, uint name_length)
 
 			if (string_key != NULL) {
 				if (!sapi_module.phpinfo_as_text) {
-					php_info_print_html_esc(string_key->val, string_key->len);
+					php_info_print_html_esc(ZSTR_VAL(string_key), ZSTR_LEN(string_key));
 				} else {
-					php_info_print(string_key->val);
+					php_info_print(ZSTR_VAL(string_key));
 				}
 			} else {
 				php_info_printf(ZEND_ULONG_FMT, num_key);
@@ -232,33 +204,29 @@ static void php_print_gpcse_array(char *name, uint name_length)
 			}
 			if (Z_TYPE_P(tmp) == IS_ARRAY) {
 				if (!sapi_module.phpinfo_as_text) {
+					zend_string *str = zend_print_zval_r_to_str(tmp, 0);
 					php_info_print("<pre>");
-					zend_print_zval_r_ex((zend_write_func_t) php_info_print_html_esc, tmp, 0);
+					php_info_print_html_esc(ZSTR_VAL(str), ZSTR_LEN(str));
 					php_info_print("</pre>");
+					zend_string_release_ex(str, 0);
 				} else {
 					zend_print_zval_r(tmp, 0);
 				}
 			} else {
-				ZVAL_COPY_VALUE(&tmp2, tmp);
-				if (Z_TYPE(tmp2) != IS_STRING) {
-					tmp = NULL;
-					zval_copy_ctor(&tmp2);
-					convert_to_string(&tmp2);
-				}
+				zend_string *tmp2;
+				zend_string *str = zval_get_tmp_string(tmp, &tmp2);
 
 				if (!sapi_module.phpinfo_as_text) {
-					if (Z_STRLEN(tmp2) == 0) {
+					if (ZSTR_LEN(str) == 0) {
 						php_info_print("<i>no value</i>");
 					} else {
-						php_info_print_html_esc(Z_STRVAL(tmp2), Z_STRLEN(tmp2));
+						php_info_print_html_esc(ZSTR_VAL(str), ZSTR_LEN(str));
 					}
 				} else {
-					php_info_print(Z_STRVAL(tmp2));
+					php_info_print(ZSTR_VAL(str));
 				}
 
-				if (!tmp) {
-					zval_dtor(&tmp2);
-				}
+				zend_tmp_string_release(tmp2);
 			}
 			if (!sapi_module.phpinfo_as_text) {
 				php_info_print("</td></tr>\n");
@@ -267,13 +235,13 @@ static void php_print_gpcse_array(char *name, uint name_length)
 			}
 		} ZEND_HASH_FOREACH_END();
 	}
-	zend_string_free(key);
+	zend_string_efree(key);
 }
 /* }}} */
 
 /* {{{ php_info_print_style
  */
-void php_info_print_style(void)
+PHPAPI ZEND_COLD void ZEND_COLD php_info_print_style(void)
 {
 	php_info_printf("<style type=\"text/css\">\n");
 	php_info_print_css();
@@ -283,7 +251,7 @@ void php_info_print_style(void)
 
 /* {{{ php_info_html_esc
  */
-PHPAPI zend_string *php_info_html_esc(char *string)
+PHPAPI ZEND_COLD zend_string *php_info_html_esc(char *string)
 {
 	return php_escape_html_entities((unsigned char *) string, strlen(string), 0, ENT_QUOTES, NULL);
 }
@@ -294,30 +262,26 @@ PHPAPI zend_string *php_info_html_esc(char *string)
 
 char* php_get_windows_name()
 {
-	OSVERSIONINFOEX osvi;
+	OSVERSIONINFOEX osvi = EG(windows_version_info);
 	SYSTEM_INFO si;
-	PGNSI pGNSI;
-	PGPI pGPI;
-	BOOL bOsVersionInfoEx;
 	DWORD dwType;
 	char *major = NULL, *sub = NULL, *retval;
 
 	ZeroMemory(&si, sizeof(SYSTEM_INFO));
-	ZeroMemory(&osvi, sizeof(OSVERSIONINFOEX));
-	osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEX);
 
-	if (!(bOsVersionInfoEx = GetVersionEx ((OSVERSIONINFO *) &osvi))) {
-		return NULL;
-	}
+	GetNativeSystemInfo(&si);
 
-	pGNSI = (PGNSI) GetProcAddress(GetModuleHandle("kernel32.dll"), "GetNativeSystemInfo");
-	if(NULL != pGNSI) {
-		pGNSI(&si);
-	} else {
-		GetSystemInfo(&si);
-	}
-
-	if (VER_PLATFORM_WIN32_NT==osvi.dwPlatformId && osvi.dwMajorVersion > 4 ) {
+	if (VER_PLATFORM_WIN32_NT==osvi.dwPlatformId && osvi.dwMajorVersion >= 10) {
+		if (osvi.dwMajorVersion == 10) {
+			if( osvi.dwMinorVersion == 0 ) {
+				if( osvi.wProductType == VER_NT_WORKSTATION ) {
+					major = "Windows 10";
+				} else {
+					major = "Windows Server 2016";
+				}
+			}
+		}
+	} else if (VER_PLATFORM_WIN32_NT==osvi.dwPlatformId && osvi.dwMajorVersion >= 6) {
 		if (osvi.dwMajorVersion == 6) {
 			if( osvi.dwMinorVersion == 0 ) {
 				if( osvi.wProductType == VER_NT_WORKSTATION ) {
@@ -325,8 +289,7 @@ char* php_get_windows_name()
 				} else {
 					major = "Windows Server 2008";
 				}
-			} else
-			if ( osvi.dwMinorVersion == 1 ) {
+			} else if ( osvi.dwMinorVersion == 1 ) {
 				if( osvi.wProductType == VER_NT_WORKSTATION )  {
 					major = "Windows 7";
 				} else {
@@ -334,6 +297,11 @@ char* php_get_windows_name()
 				}
 			} else if ( osvi.dwMinorVersion == 2 ) {
 				/* could be Windows 8/Windows Server 2012, could be Windows 8.1/Windows Server 2012 R2 */
+				/* XXX and one more X - the above comment is true if no manifest is used for two cases:
+					- if the PHP build doesn't use the correct manifest
+					- if PHP DLL loaded under some binary that doesn't use the correct manifest
+
+					So keep the handling here as is for now, even if we know 6.2 is win8 and nothing else, and think about an improvement. */
 				OSVERSIONINFOEX osvi81;
 				DWORDLONG dwlConditionMask = 0;
 				int op = VER_GREATER_EQUAL;
@@ -364,43 +332,66 @@ char* php_get_windows_name()
 						major = "Windows Server 2012";
 					}
 				}
+			} else if (osvi.dwMinorVersion == 3) {
+				if( osvi.wProductType == VER_NT_WORKSTATION )  {
+					major = "Windows 8.1";
+				} else {
+					major = "Windows Server 2012 R2";
+				}
 			} else {
 				major = "Unknown Windows version";
 			}
 
-			pGPI = (PGPI) GetProcAddress(GetModuleHandle("kernel32.dll"), "GetProductInfo");
-			pGPI(6, 0, 0, 0, &dwType);
+			/* No return value check, as it can only fail if the input parameters are broken (which we manually supply) */
+			GetProductInfo(6, 0, 0, 0, &dwType);
 
 			switch (dwType) {
 				case PRODUCT_ULTIMATE:
 					sub = "Ultimate Edition";
 					break;
-				case PRODUCT_HOME_PREMIUM:
-					sub = "Home Premium Edition";
-					break;
 				case PRODUCT_HOME_BASIC:
 					sub = "Home Basic Edition";
+					break;
+				case PRODUCT_HOME_PREMIUM:
+					sub = "Home Premium Edition";
 					break;
 				case PRODUCT_ENTERPRISE:
 					sub = "Enterprise Edition";
 					break;
+				case PRODUCT_HOME_BASIC_N:
+					sub = "Home Basic N Edition";
+					break;
 				case PRODUCT_BUSINESS:
-					sub = "Business Edition";
+					if ((osvi.dwMajorVersion > 6) || (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion > 0)) {
+						sub = "Professional Edition";
+					} else {
+						sub = "Business Edition";
+					}
 					break;
-				case PRODUCT_STARTER:
-					sub = "Starter Edition";
-					break;
-				case PRODUCT_CLUSTER_SERVER:
-					sub = "Cluster Server Edition";
+				case PRODUCT_STANDARD_SERVER:
+					sub = "Standard Edition";
 					break;
 				case PRODUCT_DATACENTER_SERVER:
 					sub = "Datacenter Edition";
 					break;
-				case PRODUCT_DATACENTER_SERVER_CORE:
-					sub = "Datacenter Edition (core installation)";
+				case PRODUCT_SMALLBUSINESS_SERVER:
+					sub = "Small Business Server";
 					break;
 				case PRODUCT_ENTERPRISE_SERVER:
 					sub = "Enterprise Edition";
+					break;
+				case PRODUCT_STARTER:
+					if ((osvi.dwMajorVersion > 6) || (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion > 0)) {
+						sub = "Starter N Edition";
+					} else {
+					    sub = "Starter Edition";
+					}
+					break;
+				case PRODUCT_DATACENTER_SERVER_CORE:
+					sub = "Datacenter Edition (core installation)";
+					break;
+				case PRODUCT_STANDARD_SERVER_CORE:
+					sub = "Standard Edition (core installation)";
 					break;
 				case PRODUCT_ENTERPRISE_SERVER_CORE:
 					sub = "Enterprise Edition (core installation)";
@@ -408,93 +399,193 @@ char* php_get_windows_name()
 				case PRODUCT_ENTERPRISE_SERVER_IA64:
 					sub = "Enterprise Edition for Itanium-based Systems";
 					break;
-				case PRODUCT_SMALLBUSINESS_SERVER:
-					sub = "Small Business Server";
-					break;
-				case PRODUCT_SMALLBUSINESS_SERVER_PREMIUM:
-					sub = "Small Business Server Premium Edition";
-					break;
-				case PRODUCT_STANDARD_SERVER:
-					sub = "Standard Edition";
-					break;
-				case PRODUCT_STANDARD_SERVER_CORE:
-					sub = "Standard Edition (core installation)";
+				case PRODUCT_BUSINESS_N:
+					if ((osvi.dwMajorVersion > 6) || (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion > 0)) {
+						sub = "Professional N Edition";
+					} else {
+						sub = "Business N Edition";
+					}
 					break;
 				case PRODUCT_WEB_SERVER:
 					sub = "Web Server Edition";
 					break;
-			}
-		}
-
-		if ( osvi.dwMajorVersion == 5 && osvi.dwMinorVersion == 2 ) {
-			if (GetSystemMetrics(SM_SERVERR2))
-				major = "Windows Server 2003 R2";
-			else if (osvi.wSuiteMask==VER_SUITE_STORAGE_SERVER)
-				major = "Windows Storage Server 2003";
-			else if (osvi.wSuiteMask==VER_SUITE_WH_SERVER)
-				major = "Windows Home Server";
-			else if (osvi.wProductType == VER_NT_WORKSTATION &&
-				si.wProcessorArchitecture==PROCESSOR_ARCHITECTURE_AMD64) {
-				major = "Windows XP Professional x64 Edition";
-			} else {
-				major = "Windows Server 2003";
-			}
-
-			/* Test for the server type. */
-			if ( osvi.wProductType != VER_NT_WORKSTATION ) {
-				if ( si.wProcessorArchitecture==PROCESSOR_ARCHITECTURE_IA64 ) {
-					if( osvi.wSuiteMask & VER_SUITE_DATACENTER )
-						sub = "Datacenter Edition for Itanium-based Systems";
-					else if( osvi.wSuiteMask & VER_SUITE_ENTERPRISE )
-						sub = "Enterprise Edition for Itanium-based Systems";
-				}
-
-				else if ( si.wProcessorArchitecture==PROCESSOR_ARCHITECTURE_AMD64 ) {
-					if( osvi.wSuiteMask & VER_SUITE_DATACENTER )
-						sub = "Datacenter x64 Edition";
-					else if( osvi.wSuiteMask & VER_SUITE_ENTERPRISE )
-						sub = "Enterprise x64 Edition";
-					else sub = "Standard x64 Edition";
-				} else {
-					if ( osvi.wSuiteMask & VER_SUITE_COMPUTE_SERVER )
-						sub = "Compute Cluster Edition";
-					else if( osvi.wSuiteMask & VER_SUITE_DATACENTER )
-						sub = "Datacenter Edition";
-					else if( osvi.wSuiteMask & VER_SUITE_ENTERPRISE )
-						sub = "Enterprise Edition";
-					else if ( osvi.wSuiteMask & VER_SUITE_BLADE )
-						sub = "Web Edition";
-					else sub = "Standard Edition";
-				}
-			}
-		}
-
-		if ( osvi.dwMajorVersion == 5 && osvi.dwMinorVersion == 1 )	{
-			major = "Windows XP";
-			if( osvi.wSuiteMask & VER_SUITE_PERSONAL ) {
-				sub = "Home Edition";
-			} else if (GetSystemMetrics(SM_MEDIACENTER)) {
-				sub = "Media Center Edition";
-			} else if (GetSystemMetrics(SM_STARTER)) {
-				sub = "Starter Edition";
-			} else if (GetSystemMetrics(SM_TABLETPC)) {
-				sub = "Tablet PC Edition";
-			} else {
-				sub = "Professional";
-			}
-		}
-
-		if ( osvi.dwMajorVersion == 5 && osvi.dwMinorVersion == 0 ) {
-			major = "Windows 2000";
-
-			if (osvi.wProductType == VER_NT_WORKSTATION ) {
-				sub = "Professional";
-			} else {
-				if( osvi.wSuiteMask & VER_SUITE_DATACENTER )
-					sub = "Datacenter Server";
-				else if( osvi.wSuiteMask & VER_SUITE_ENTERPRISE )
-					sub = "Advanced Server";
-				else sub = "Server";
+				case PRODUCT_CLUSTER_SERVER:
+					sub = "HPC Edition";
+					break;
+				case PRODUCT_HOME_SERVER:
+					sub = "Storage Server Essentials Edition";
+					break;
+				case PRODUCT_STORAGE_EXPRESS_SERVER:
+					sub = "Storage Server Express Edition";
+					break;
+				case PRODUCT_STORAGE_STANDARD_SERVER:
+					sub = "Storage Server Standard Edition";
+					break;
+				case PRODUCT_STORAGE_WORKGROUP_SERVER:
+					sub = "Storage Server Workgroup Edition";
+					break;
+				case PRODUCT_STORAGE_ENTERPRISE_SERVER:
+					sub = "Storage Server Enterprise Edition";
+					break;
+				case PRODUCT_SERVER_FOR_SMALLBUSINESS:
+					sub = "Essential Server Solutions Edition";
+					break;
+				case PRODUCT_SMALLBUSINESS_SERVER_PREMIUM:
+					sub = "Small Business Server Premium Edition";
+					break;
+				case PRODUCT_HOME_PREMIUM_N:
+					sub = "Home Premium N Edition";
+					break;
+				case PRODUCT_ENTERPRISE_N:
+					sub = "Enterprise N Edition";
+					break;
+				case PRODUCT_ULTIMATE_N:
+					sub = "Ultimate N Edition";
+					break;
+				case PRODUCT_WEB_SERVER_CORE:
+					sub = "Web Server Edition (core installation)";
+					break;
+				case PRODUCT_MEDIUMBUSINESS_SERVER_MANAGEMENT:
+					sub = "Essential Business Server Management Server Edition";
+					break;
+				case PRODUCT_MEDIUMBUSINESS_SERVER_SECURITY:
+					sub = "Essential Business Server Management Security Edition";
+					break;
+				case PRODUCT_MEDIUMBUSINESS_SERVER_MESSAGING:
+					sub = "Essential Business Server Management Messaging Edition";
+					break;
+				case PRODUCT_SERVER_FOUNDATION:
+					sub = "Foundation Edition";
+					break;
+				case PRODUCT_HOME_PREMIUM_SERVER:
+					sub = "Home Server 2011 Edition";
+					break;
+				case PRODUCT_SERVER_FOR_SMALLBUSINESS_V:
+					sub = "Essential Server Solutions Edition (without Hyper-V)";
+					break;
+				case PRODUCT_STANDARD_SERVER_V:
+					sub = "Standard Edition (without Hyper-V)";
+					break;
+				case PRODUCT_DATACENTER_SERVER_V:
+					sub = "Datacenter Edition (without Hyper-V)";
+					break;
+				case PRODUCT_ENTERPRISE_SERVER_V:
+					sub = "Enterprise Edition (without Hyper-V)";
+					break;
+				case PRODUCT_DATACENTER_SERVER_CORE_V:
+					sub = "Datacenter Edition (core installation, without Hyper-V)";
+					break;
+				case PRODUCT_STANDARD_SERVER_CORE_V:
+					sub = "Standard Edition (core installation, without Hyper-V)";
+					break;
+				case PRODUCT_ENTERPRISE_SERVER_CORE_V:
+					sub = "Enterprise Edition (core installation, without Hyper-V)";
+					break;
+				case PRODUCT_HYPERV:
+					sub = "Hyper-V Server";
+					break;
+				case PRODUCT_STORAGE_EXPRESS_SERVER_CORE:
+					sub = "Storage Server Express Edition (core installation)";
+					break;
+				case PRODUCT_STORAGE_STANDARD_SERVER_CORE:
+					sub = "Storage Server Standard Edition (core installation)";
+					break;
+				case PRODUCT_STORAGE_WORKGROUP_SERVER_CORE:
+					sub = "Storage Server Workgroup Edition (core installation)";
+					break;
+				case PRODUCT_STORAGE_ENTERPRISE_SERVER_CORE:
+					sub = "Storage Server Enterprise Edition (core installation)";
+					break;
+				case PRODUCT_STARTER_N:
+					sub = "Starter N Edition";
+					break;
+				case PRODUCT_PROFESSIONAL:
+					sub = "Professional Edition";
+					break;
+				case PRODUCT_PROFESSIONAL_N:
+					sub = "Professional N Edition";
+					break;
+				case PRODUCT_SB_SOLUTION_SERVER:
+					sub = "Small Business Server 2011 Essentials Edition";
+					break;
+				case PRODUCT_SERVER_FOR_SB_SOLUTIONS:
+					sub = "Server For SB Solutions Edition";
+					break;
+				case PRODUCT_STANDARD_SERVER_SOLUTIONS:
+					sub = "Solutions Premium Edition";
+					break;
+				case PRODUCT_STANDARD_SERVER_SOLUTIONS_CORE:
+					sub = "Solutions Premium Edition (core installation)";
+					break;
+				case PRODUCT_SB_SOLUTION_SERVER_EM:
+					sub = "Server For SB Solutions EM Edition";
+					break;
+				case PRODUCT_SERVER_FOR_SB_SOLUTIONS_EM:
+					sub = "Server For SB Solutions EM Edition";
+					break;
+				case PRODUCT_SOLUTION_EMBEDDEDSERVER:
+					sub = "MultiPoint Server Edition";
+					break;
+				case PRODUCT_ESSENTIALBUSINESS_SERVER_MGMT:
+					sub = "Essential Server Solution Management Edition";
+					break;
+				case PRODUCT_ESSENTIALBUSINESS_SERVER_ADDL:
+					sub = "Essential Server Solution Additional Edition";
+					break;
+				case PRODUCT_ESSENTIALBUSINESS_SERVER_MGMTSVC:
+					sub = "Essential Server Solution Management SVC Edition";
+					break;
+				case PRODUCT_ESSENTIALBUSINESS_SERVER_ADDLSVC:
+					sub = "Essential Server Solution Additional SVC Edition";
+					break;
+				case PRODUCT_SMALLBUSINESS_SERVER_PREMIUM_CORE:
+					sub = "Small Business Server Premium Edition (core installation)";
+					break;
+				case PRODUCT_CLUSTER_SERVER_V:
+					sub = "Hyper Core V Edition";
+					break;
+				case PRODUCT_STARTER_E:
+					sub = "Hyper Core V Edition";
+					break;
+				case PRODUCT_ENTERPRISE_EVALUATION:
+					sub = "Enterprise Edition (evaluation installation)";
+					break;
+				case PRODUCT_MULTIPOINT_STANDARD_SERVER:
+					sub = "MultiPoint Server Standard Edition (full installation)";
+					break;
+				case PRODUCT_MULTIPOINT_PREMIUM_SERVER:
+					sub = "MultiPoint Server Premium Edition (full installation)";
+					break;
+				case PRODUCT_STANDARD_EVALUATION_SERVER:
+					sub = "Standard Edition (evaluation installation)";
+					break;
+				case PRODUCT_DATACENTER_EVALUATION_SERVER:
+					sub = "Datacenter Edition (evaluation installation)";
+					break;
+				case PRODUCT_ENTERPRISE_N_EVALUATION:
+					sub = "Enterprise N Edition (evaluation installation)";
+					break;
+				case PRODUCT_STORAGE_WORKGROUP_EVALUATION_SERVER:
+					sub = "Storage Server Workgroup Edition (evaluation installation)";
+					break;
+				case PRODUCT_STORAGE_STANDARD_EVALUATION_SERVER:
+					sub = "Storage Server Standard Edition (evaluation installation)";
+					break;
+				case PRODUCT_CORE_N:
+					sub = "Windows 8 N Edition";
+					break;
+				case PRODUCT_CORE_COUNTRYSPECIFIC:
+					sub = "Windows 8 China Edition";
+					break;
+				case PRODUCT_CORE_SINGLELANGUAGE:
+					sub = "Windows 8 Single Language Edition";
+					break;
+				case PRODUCT_CORE:
+					sub = "Windows 8 Edition";
+					break;
+				case PRODUCT_PROFESSIONAL_WMC:
+					sub = "Professional with Media Center Edition";
+					break;
 			}
 		}
 	} else {
@@ -614,30 +705,6 @@ PHPAPI zend_string *php_get_uname(char mode)
 	if (uname((struct utsname *)&buf) == -1) {
 		php_uname = PHP_UNAME;
 	} else {
-#ifdef NETWARE
-		if (mode == 's') {
-			php_uname = buf.sysname;
-		} else if (mode == 'r') {
-			snprintf(tmp_uname, sizeof(tmp_uname), "%d.%d.%d",
-					 buf.netware_major, buf.netware_minor, buf.netware_revision);
-			php_uname = tmp_uname;
-		} else if (mode == 'n') {
-			php_uname = buf.servername;
-		} else if (mode == 'v') {
-			snprintf(tmp_uname, sizeof(tmp_uname), "libc-%d.%d.%d #%d",
-					 buf.libmajor, buf.libminor, buf.librevision, buf.libthreshold);
-			php_uname = tmp_uname;
-		} else if (mode == 'm') {
-			php_uname = buf.machine;
-		} else { /* assume mode == 'a' */
-			snprintf(tmp_uname, sizeof(tmp_uname), "%s %s %d.%d.%d libc-%d.%d.%d #%d %s",
-					 buf.sysname, buf.servername,
-					 buf.netware_major, buf.netware_minor, buf.netware_revision,
-					 buf.libmajor, buf.libminor, buf.librevision, buf.libthreshold,
-					 buf.machine);
-			php_uname = tmp_uname;
-		}
-#else
 		if (mode == 's') {
 			php_uname = buf.sysname;
 		} else if (mode == 'r') {
@@ -654,7 +721,6 @@ PHPAPI zend_string *php_get_uname(char mode)
 					 buf.machine);
 			php_uname = tmp_uname;
 		}
-#endif /* NETWARE */
 	}
 #else
 	php_uname = PHP_UNAME;
@@ -666,13 +732,13 @@ PHPAPI zend_string *php_get_uname(char mode)
 
 /* {{{ php_print_info_htmlhead
  */
-PHPAPI void php_print_info_htmlhead(void)
+PHPAPI ZEND_COLD void php_print_info_htmlhead(void)
 {
 	php_info_print("<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"DTD/xhtml1-transitional.dtd\">\n");
 	php_info_print("<html xmlns=\"http://www.w3.org/1999/xhtml\">");
 	php_info_print("<head>\n");
 	php_info_print_style();
-	php_info_print("<title>phpinfo()</title>");
+	php_info_printf("<title>PHP %s - phpinfo()</title>", PHP_VERSION);
 	php_info_print("<meta name=\"ROBOTS\" content=\"NOINDEX,NOFOLLOW,NOARCHIVE\" />");
 	php_info_print("</head>\n");
 	php_info_print("<body><div class=\"center\">\n");
@@ -692,7 +758,7 @@ static int module_name_cmp(const void *a, const void *b)
 
 /* {{{ php_print_info
  */
-PHPAPI void php_print_info(int flag)
+PHPAPI ZEND_COLD void php_print_info(int flag)
 {
 	char **env, *tmp1, *tmp2;
 	zend_string *php_uname;
@@ -704,7 +770,7 @@ PHPAPI void php_print_info(int flag)
 	}
 
 	if (flag & PHP_INFO_GENERAL) {
-		char *zend_version = get_zend_version();
+		const char *zend_version = get_zend_version();
 		char temp_api[10];
 
 		php_uname = php_get_uname('a');
@@ -735,7 +801,7 @@ PHPAPI void php_print_info(int flag)
 		}
 		php_info_print_box_end();
 		php_info_print_table_start();
-		php_info_print_table_row(2, "System", php_uname->val);
+		php_info_print_table_row(2, "System", ZSTR_VAL(php_uname));
 		php_info_print_table_row(2, "Build Date", __DATE__ " " __TIME__);
 #ifdef COMPILER
 		php_info_print_table_row(2, "Compiler", COMPILER);
@@ -782,6 +848,7 @@ PHPAPI void php_print_info(int flag)
 
 #ifdef ZTS
 		php_info_print_table_row(2, "Thread Safety", "enabled" );
+		php_info_print_table_row(2, "Thread API", tsrm_api_name() );
 #else
 		php_info_print_table_row(2, "Thread Safety", "disabled" );
 #endif
@@ -813,7 +880,7 @@ PHPAPI void php_print_info(int flag)
 #endif
 
 #if HAVE_DTRACE
-		php_info_print_table_row(2, "DTrace Support", "enabled" );
+		php_info_print_table_row(2, "DTrace Support", (zend_dtrace_enabled ? "enabled" : "available, disabled"));
 #else
 		php_info_print_table_row(2, "DTrace Support", "disabled" );
 #endif
@@ -858,17 +925,26 @@ PHPAPI void php_print_info(int flag)
 
 	if (flag & PHP_INFO_MODULES) {
 		HashTable sorted_registry;
+		zend_module_entry *module;
 
 		zend_hash_init(&sorted_registry, zend_hash_num_elements(&module_registry), NULL, NULL, 1);
 		zend_hash_copy(&sorted_registry, &module_registry, NULL);
 		zend_hash_sort(&sorted_registry, module_name_cmp, 0);
 
-		zend_hash_apply(&sorted_registry, _display_module_info_func);
+		ZEND_HASH_FOREACH_PTR(&sorted_registry, module) {
+			if (module->info_func || module->version) {
+				php_info_print_module(module);
+			}
+		} ZEND_HASH_FOREACH_END();
 
 		SECTION("Additional Modules");
 		php_info_print_table_start();
 		php_info_print_table_header(1, "Module Name");
-		zend_hash_apply(&sorted_registry, _display_module_info_def);
+		ZEND_HASH_FOREACH_PTR(&sorted_registry, module) {
+			if (!module->info_func && !module->version) {
+				php_info_print_module(module);
+			}
+		} ZEND_HASH_FOREACH_END();
 		php_info_print_table_end();
 
 		zend_hash_destroy(&sorted_registry);
@@ -878,6 +954,7 @@ PHPAPI void php_print_info(int flag)
 		SECTION("Environment");
 		php_info_print_table_start();
 		php_info_print_table_header(2, "Variable", "Value");
+		tsrm_env_lock();
 		for (env=environ; env!=NULL && *env !=NULL; env++) {
 			tmp1 = estrdup(*env);
 			if (!(tmp2=strchr(tmp1,'='))) { /* malformed entry? */
@@ -889,6 +966,7 @@ PHPAPI void php_print_info(int flag)
 			php_info_print_table_row(2, tmp1, tmp2);
 			efree(tmp1);
 		}
+        tsrm_env_unlock();
 		php_info_print_table_end();
 	}
 
@@ -967,7 +1045,7 @@ PHPAPI void php_print_info(int flag)
 }
 /* }}} */
 
-PHPAPI void php_info_print_table_start(void) /* {{{ */
+PHPAPI ZEND_COLD void php_info_print_table_start(void) /* {{{ */
 {
 	if (!sapi_module.phpinfo_as_text) {
 		php_info_print("<table>\n");
@@ -977,7 +1055,7 @@ PHPAPI void php_info_print_table_start(void) /* {{{ */
 }
 /* }}} */
 
-PHPAPI void php_info_print_table_end(void) /* {{{ */
+PHPAPI ZEND_COLD void php_info_print_table_end(void) /* {{{ */
 {
 	if (!sapi_module.phpinfo_as_text) {
 		php_info_print("</table>\n");
@@ -986,7 +1064,7 @@ PHPAPI void php_info_print_table_end(void) /* {{{ */
 }
 /* }}} */
 
-PHPAPI void php_info_print_box_start(int flag) /* {{{ */
+PHPAPI ZEND_COLD void php_info_print_box_start(int flag) /* {{{ */
 {
 	php_info_print_table_start();
 	if (flag) {
@@ -1003,7 +1081,7 @@ PHPAPI void php_info_print_box_start(int flag) /* {{{ */
 }
 /* }}} */
 
-PHPAPI void php_info_print_box_end(void) /* {{{ */
+PHPAPI ZEND_COLD void php_info_print_box_end(void) /* {{{ */
 {
 	if (!sapi_module.phpinfo_as_text) {
 		php_info_print("</td></tr>\n");
@@ -1012,7 +1090,7 @@ PHPAPI void php_info_print_box_end(void) /* {{{ */
 }
 /* }}} */
 
-PHPAPI void php_info_print_hr(void) /* {{{ */
+PHPAPI ZEND_COLD void php_info_print_hr(void) /* {{{ */
 {
 	if (!sapi_module.phpinfo_as_text) {
 		php_info_print("<hr />\n");
@@ -1022,7 +1100,7 @@ PHPAPI void php_info_print_hr(void) /* {{{ */
 }
 /* }}} */
 
-PHPAPI void php_info_print_table_colspan_header(int num_cols, char *header) /* {{{ */
+PHPAPI ZEND_COLD void php_info_print_table_colspan_header(int num_cols, char *header) /* {{{ */
 {
 	int spaces;
 
@@ -1037,7 +1115,7 @@ PHPAPI void php_info_print_table_colspan_header(int num_cols, char *header) /* {
 
 /* {{{ php_info_print_table_header
  */
-PHPAPI void php_info_print_table_header(int num_cols, ...)
+PHPAPI ZEND_COLD void php_info_print_table_header(int num_cols, ...)
 {
 	int i;
 	va_list row_elements;
@@ -1075,7 +1153,7 @@ PHPAPI void php_info_print_table_header(int num_cols, ...)
 
 /* {{{ php_info_print_table_row_internal
  */
-static void php_info_print_table_row_internal(int num_cols,
+static ZEND_COLD void php_info_print_table_row_internal(int num_cols,
 		const char *value_class, va_list row_elements)
 {
 	int i;
@@ -1121,7 +1199,7 @@ static void php_info_print_table_row_internal(int num_cols,
 
 /* {{{ php_info_print_table_row
  */
-PHPAPI void php_info_print_table_row(int num_cols, ...)
+PHPAPI ZEND_COLD void php_info_print_table_row(int num_cols, ...)
 {
 	va_list row_elements;
 
@@ -1133,7 +1211,7 @@ PHPAPI void php_info_print_table_row(int num_cols, ...)
 
 /* {{{ php_info_print_table_row_ex
  */
-PHPAPI void php_info_print_table_row_ex(int num_cols, const char *value_class,
+PHPAPI ZEND_COLD void php_info_print_table_row_ex(int num_cols, const char *value_class,
 		...)
 {
 	va_list row_elements;
@@ -1167,15 +1245,16 @@ void register_phpinfo_constants(INIT_FUNC_ARGS)
 }
 /* }}} */
 
-/* {{{ proto void phpinfo([int what])
+/* {{{ proto bool phpinfo([int what])
    Output a page of useful information about PHP and the current request */
 PHP_FUNCTION(phpinfo)
 {
 	zend_long flag = PHP_INFO_ALL;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS(), "|l", &flag) == FAILURE) {
-		return;
-	}
+	ZEND_PARSE_PARAMETERS_START(0, 1)
+		Z_PARAM_OPTIONAL
+		Z_PARAM_LONG(flag)
+	ZEND_PARSE_PARAMETERS_END();
 
 	/* Andale!  Andale!  Yee-Hah! */
 	php_output_start_default();
@@ -1187,16 +1266,17 @@ PHP_FUNCTION(phpinfo)
 
 /* }}} */
 
-/* {{{ proto string phpversion([string extension])
+/* {{{ proto string|false phpversion([string extension])
    Return the current PHP version */
 PHP_FUNCTION(phpversion)
 {
 	char *ext_name = NULL;
 	size_t ext_name_len = 0;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS(), "|s", &ext_name, &ext_name_len) == FAILURE) {
-		return;
-	}
+	ZEND_PARSE_PARAMETERS_START(0, 1)
+		Z_PARAM_OPTIONAL
+		Z_PARAM_STRING(ext_name, ext_name_len)
+	ZEND_PARSE_PARAMETERS_END();
 
 	if (!ext_name) {
 		RETURN_STRING(PHP_VERSION);
@@ -1211,22 +1291,23 @@ PHP_FUNCTION(phpversion)
 }
 /* }}} */
 
-/* {{{ proto void phpcredits([int flag])
+/* {{{ proto bool phpcredits([int flag])
    Prints the list of people who've contributed to the PHP project */
 PHP_FUNCTION(phpcredits)
 {
 	zend_long flag = PHP_CREDITS_ALL;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS(), "|l", &flag) == FAILURE) {
-		return;
-	}
+	ZEND_PARSE_PARAMETERS_START(0, 1)
+		Z_PARAM_OPTIONAL
+		Z_PARAM_LONG(flag)
+	ZEND_PARSE_PARAMETERS_END();
 
 	php_print_credits((int)flag);
 	RETURN_TRUE;
 }
 /* }}} */
 
-/* {{{ proto string php_sapi_name(void)
+/* {{{ proto string|false php_sapi_name(void)
    Return the current SAPI module name */
 PHP_FUNCTION(php_sapi_name)
 {
@@ -1250,15 +1331,17 @@ PHP_FUNCTION(php_uname)
 	char *mode = "a";
 	size_t modelen = sizeof("a")-1;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS(), "|s", &mode, &modelen) == FAILURE) {
-		return;
-	}
+	ZEND_PARSE_PARAMETERS_START(0, 1)
+		Z_PARAM_OPTIONAL
+		Z_PARAM_STRING(mode, modelen)
+	ZEND_PARSE_PARAMETERS_END();
+
 	RETURN_STR(php_get_uname(*mode));
 }
 
 /* }}} */
 
-/* {{{ proto string php_ini_scanned_files(void)
+/* {{{ proto string|false php_ini_scanned_files(void)
    Return comma-separated string of .ini files parsed from the additional ini dir */
 PHP_FUNCTION(php_ini_scanned_files)
 {
@@ -1266,7 +1349,7 @@ PHP_FUNCTION(php_ini_scanned_files)
 		return;
 	}
 
-	if (strlen(PHP_CONFIG_FILE_SCAN_DIR) && php_ini_scanned_files) {
+	if (php_ini_scanned_files) {
 		RETURN_STRING(php_ini_scanned_files);
 	} else {
 		RETURN_FALSE;
@@ -1274,7 +1357,7 @@ PHP_FUNCTION(php_ini_scanned_files)
 }
 /* }}} */
 
-/* {{{ proto string php_ini_loaded_file(void)
+/* {{{ proto string|false php_ini_loaded_file(void)
    Return the actual loaded ini filename */
 PHP_FUNCTION(php_ini_loaded_file)
 {
@@ -1289,12 +1372,3 @@ PHP_FUNCTION(php_ini_loaded_file)
 	}
 }
 /* }}} */
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: sw=4 ts=4 fdm=marker
- * vim<600: sw=4 ts=4
- */

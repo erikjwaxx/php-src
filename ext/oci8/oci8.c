@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | PHP Version 7                                                        |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1997-2015 The PHP Group                                |
+   | Copyright (c) The PHP Group                                          |
    +----------------------------------------------------------------------+
    | This source file is subject to version 3.01 of the PHP license,      |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -21,7 +21,7 @@
    | ZTS per process OCIPLogon by Harald Radi <harald.radi@nme.at>        |
    |                                                                      |
    | Redesigned by: Antony Dovgal <antony@zend.com>                       |
-   |                Andi Gutmans <andi@zend.com>                          |
+   |                Andi Gutmans <andi@php.net>                           |
    |                Wez Furlong <wez@omniti.com>                          |
    +----------------------------------------------------------------------+
 */
@@ -40,25 +40,14 @@
 /* PHP 5.2 is the minimum supported version for OCI8 2.0 */
 #if PHP_MAJOR_VERSION < 5 || (PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION <= 1)
 #error Use PHP OCI8 1.4 for your version of PHP
+#elif PHP_MAJOR_VERSION < 7
+/* PHP 7 is the minimum supported version for OCI8 2.1 */
+#error Use PHP OCI8 2.0 for your version of PHP
 #endif
 
 #include "php_oci8.h"
 #include "php_oci8_int.h"
 #include "zend_hash.h"
-
-#if defined(__PTRDIFF_TYPE__)
-# define OCI8_INT_TO_PTR(I)  ((void*)(__PTRDIFF_TYPE__)(I))
-# define OCI8_PTR_TO_INT(P)  ((int)(__PTRDIFF_TYPE__)(P))
-#elif !defined(__GNUC__)
-#define OCI8_INT_TO_PTR(I)  ((void*)&((char*)0)[I])
-#define OCI8_PTR_TO_INT(P)  ((int)(((char*)P)-(char*)0))
-#elif defined(HAVE_STDINT_H)
-#define OCI8_INT_TO_PTR(I)  ((void*)(intptr_t)(I))
-#define OCI8_PTR_TO_INT(P)  ((int)(intptr_t)(P))
-#else
-#define OCI8_INT_TO_PTR(I)  ((void*)(I))
-#define OCI8_PTR_TO_INT(P)  ((int)(P))
-#endif
 
 ZEND_DECLARE_MODULE_GLOBALS(oci)
 static PHP_GINIT_FUNCTION(oci);
@@ -100,19 +89,6 @@ zend_class_entry *oci_coll_class_entry_ptr;
 #define SQLT_CFILEE 115
 #endif
 
-#ifdef OCI_ERROR_MAXMSG_SIZE2
-/* Bigger size is defined from 11.2.0.3 onwards */
-#define PHP_OCI_ERRBUF_LEN OCI_ERROR_MAXMSG_SIZE2
-#else
-#define PHP_OCI_ERRBUF_LEN OCI_ERROR_MAXMSG_SIZE
-#endif
-
-#if ZEND_MODULE_API_NO > 20020429
-#define ONUPDATELONGFUNC OnUpdateLong
-#else
-#define ONUPDATELONGFUNC OnUpdateInt
-#endif
-
 #ifdef ZTS
 #define PHP_OCI_INIT_MODE (OCI_DEFAULT | OCI_OBJECT | OCI_THREADED | OCI_NO_MUTEX)
 #else
@@ -128,7 +104,7 @@ static void php_oci_descriptor_list_dtor (zend_resource *);
 static void php_oci_spool_list_dtor(zend_resource *entry);
 static void php_oci_collection_list_dtor (zend_resource *);
 
-static int php_oci_persistent_helper(zend_resource *le);
+static int php_oci_persistent_helper(zval *zv);
 static int php_oci_connection_ping(php_oci_connection *);
 static int php_oci_connection_status(php_oci_connection *);
 static int php_oci_connection_close(php_oci_connection *);
@@ -147,8 +123,6 @@ static sword php_oci_ping_init(php_oci_connection *connection, OCIError *errh);
 ZEND_GET_MODULE(oci8)
 #endif /* COMPILE_DL */
 /* }}} */
-
-#if defined(ZEND_ENGINE_2) || defined(ZEND_ENGINE_3)
 
 /* {{{ Function arginfo */
 ZEND_BEGIN_ARG_INFO_EX(arginfo_oci_define_by_name, 0, 0, 3)
@@ -449,12 +423,15 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_oci_set_client_info, 0, 0, 2)
 	ZEND_ARG_INFO(0, client_information)
 ZEND_END_ARG_INFO()
 
-#ifdef WAITIING_ORACLE_BUG_16695981_FIX
 ZEND_BEGIN_ARG_INFO_EX(arginfo_oci_set_db_operation, 0, 0, 2)
-ZEND_ARG_INFO(0, connection_resource)
-ZEND_ARG_INFO(0, action)
+	ZEND_ARG_INFO(0, connection_resource)
+	ZEND_ARG_INFO(0, action)
 ZEND_END_ARG_INFO()
-#endif
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_oci_set_call_timeout, 0, 0, 2)
+	ZEND_ARG_INFO(0, connection_resource)
+	ZEND_ARG_INFO(0, call_timeout)
+ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_oci_password_change, 0, 0, 4)
 	ZEND_ARG_INFO(0, connection_resource_or_connection_string)
@@ -529,6 +506,15 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_oci_new_collection, 0, 0, 2)
 	ZEND_ARG_INFO(0, connection_resource)
 	ZEND_ARG_INFO(0, type_name)
 	ZEND_ARG_INFO(0, schema_name)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_oci_register_taf_callback, 0, 0, 1)
+	ZEND_ARG_INFO(0, connection_resource)
+	ZEND_ARG_INFO(0, function_name)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_oci_unregister_taf_callback, 0, 0, 1)
+	ZEND_ARG_INFO(0, connection_resource)
 ZEND_END_ARG_INFO()
 /* }}} */
 
@@ -645,118 +631,6 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_oci_collection_trim_method, 0, 0, 1)
 ZEND_END_ARG_INFO()
 /* }}} */
 
-#else /* defined(ZEND_ENGINE_2) || defined(ZEND_ENGINE_3) */
-/* {{{ Keep the old arginfo behavior when building with PHP 4 */
-
-static unsigned char arginfo_ocifetchinto[]  = { 2, BYREF_NONE, BYREF_FORCE };
-static unsigned char arginfo_oci_fetch_all[] = { 2, BYREF_NONE, BYREF_FORCE };
-static unsigned char arginfo_oci_define_by_name[] = { 3, BYREF_NONE, BYREF_NONE, BYREF_FORCE };
-static unsigned char arginfo_oci_bind_by_name[] = { 3, BYREF_NONE, BYREF_NONE, BYREF_FORCE };
-static unsigned char arginfo_oci_bind_array_by_name[] = { 3, BYREF_NONE, BYREF_NONE, BYREF_FORCE };
-
-#define arginfo_oci_free_descriptor						NULL
-#define arginfo_oci_lob_save							NULL
-#define arginfo_oci_lob_import							NULL
-#define arginfo_oci_lob_load							NULL
-#define arginfo_oci_lob_read							NULL
-#define arginfo_oci_lob_eof								NULL
-#define arginfo_oci_lob_tell							NULL
-#define arginfo_oci_lob_rewind							NULL
-#define arginfo_oci_lob_seek							NULL
-#define arginfo_oci_lob_size							NULL
-#define arginfo_oci_lob_write							NULL
-#define arginfo_oci_lob_append							NULL
-#define arginfo_oci_lob_truncate						NULL
-#define arginfo_oci_lob_erase							NULL
-#define arginfo_oci_lob_flush							NULL
-#define arginfo_ocisetbufferinglob						NULL
-#define arginfo_ocigetbufferinglob						NULL
-#define arginfo_oci_lob_copy							NULL
-#define arginfo_oci_lob_is_equal						NULL
-#define arginfo_oci_lob_export							NULL
-#define arginfo_oci_new_descriptor						NULL
-#define arginfo_oci_rollback							NULL
-#define arginfo_oci_commit								NULL
-#define arginfo_oci_field_name							NULL
-#define arginfo_oci_field_size							NULL
-#define arginfo_oci_field_scale							NULL
-#define arginfo_oci_field_precision						NULL
-#define arginfo_oci_field_type							NULL
-#define arginfo_oci_field_type_raw						NULL
-#define arginfo_oci_field_is_null						NULL
-#define arginfo_oci_internal_debug						NULL
-#define arginfo_oci_execute								NULL
-#define arginfo_oci_cancel								NULL
-#define arginfo_oci_fetch								NULL
-#define arginfo_oci_fetch_object						NULL
-#define arginfo_oci_fetch_row							NULL
-#define arginfo_oci_fetch_assoc							NULL
-#define arginfo_oci_fetch_array							NULL
-#define arginfo_oci_free_statement						NULL
-#define arginfo_oci_close								NULL
-#define arginfo_oci_new_connect							NULL
-#define arginfo_oci_connect								NULL
-#define arginfo_oci_pconnect							NULL
-#define arginfo_oci_error								NULL
-#define arginfo_oci_num_fields							NULL
-#define arginfo_oci_parse								NULL
-#define arginfo_oci_get_implicit_resultset				NULL
-#define arginfo_oci_set_prefetch						NULL
-#define arginfo_oci_set_client_identifier				NULL
-#define arginfo_oci_set_edition							NULL
-#define arginfo_oci_set_module_name						NULL
-#define arginfo_oci_set_action							NULL
-#define arginfo_oci_set_client_info						NULL
-#ifdef WAITIING_ORACLE_BUG_16695981_FIX
-#define arginfo_oci_set_db_operation					NULL
-#endif
-#define arginfo_oci_password_change						NULL
-#define arginfo_oci_new_cursor							NULL
-#define arginfo_oci_result								NULL
-#define arginfo_oci_client_version						NULL
-#define arginfo_oci_server_version						NULL
-#define arginfo_oci_statement_type						NULL
-#define arginfo_oci_num_rows							NULL
-#define arginfo_oci_free_collection						NULL
-#define arginfo_oci_collection_append					NULL
-#define arginfo_oci_collection_element_get				NULL
-#define arginfo_oci_collection_assign					NULL
-#define arginfo_oci_collection_element_assign			NULL
-#define arginfo_oci_collection_size						NULL
-#define arginfo_oci_collection_max						NULL
-#define arginfo_oci_collection_trim						NULL
-#define arginfo_oci_new_collection						NULL
-#define arginfo_oci_lob_size_method						NULL
-#define arginfo_oci_lob_getbuffering_method				NULL
-#define arginfo_oci_lob_close_method					NULL
-#define arginfo_oci_lob_save_method						NULL
-#define arginfo_oci_lob_import_method					NULL
-#define arginfo_oci_lob_read_method						NULL
-#define arginfo_oci_lob_seek_method						NULL
-#define arginfo_oci_lob_write_method					NULL
-#define arginfo_oci_lob_append_method					NULL
-#define arginfo_oci_lob_truncate_method					NULL
-#define arginfo_oci_lob_erase_method					NULL
-#define arginfo_oci_lob_flush_method					NULL
-#define arginfo_oci_lob_setbuffering_method				NULL
-#define arginfo_oci_lob_export_method					NULL
-#define arginfo_oci_lob_write_temporary_method			NULL
-#define arginfo_oci_lob_load_method						NULL
-#define arginfo_oci_lob_tell_method						NULL
-#define arginfo_oci_lob_rewind_method					NULL
-#define arginfo_oci_lob_eof_method						NULL
-#define arginfo_oci_free_descriptor_method				NULL
-#define arginfo_oci_collection_append_method			NULL
-#define arginfo_oci_collection_element_get_method		NULL
-#define arginfo_oci_collection_assign_method			NULL
-#define arginfo_oci_collection_size_method				NULL
-#define arginfo_oci_collection_element_assign_method	NULL
-#define arginfo_oci_collection_max_method				NULL
-#define arginfo_oci_collection_trim_method				NULL
-#define arginfo_oci_collection_free_method				NULL
-/* }}} */
-#endif /* defined(ZEND_ENGINE_2) || defined(ZEND_ENGINE_3) */
-
 /* {{{ extension function prototypes
 */
 PHP_FUNCTION(oci_bind_by_name);
@@ -801,9 +675,8 @@ PHP_FUNCTION(oci_statement_type);
 PHP_FUNCTION(oci_num_rows);
 PHP_FUNCTION(oci_set_prefetch);
 PHP_FUNCTION(oci_set_client_identifier);
-#ifdef WAITIING_ORACLE_BUG_16695981_FIX
 PHP_FUNCTION(oci_set_db_operation);
-#endif
+PHP_FUNCTION(oci_set_call_timeout);
 PHP_FUNCTION(oci_set_edition);
 PHP_FUNCTION(oci_set_module_name);
 PHP_FUNCTION(oci_set_action);
@@ -839,16 +712,13 @@ PHP_FUNCTION(oci_collection_assign);
 PHP_FUNCTION(oci_collection_size);
 PHP_FUNCTION(oci_collection_max);
 PHP_FUNCTION(oci_collection_trim);
+PHP_FUNCTION(oci_register_taf_callback);
+PHP_FUNCTION(oci_unregister_taf_callback);
 /* }}} */
 
 /* {{{ extension definition structures
 */
-static
-#if (PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION > 2) || (PHP_MAJOR_VERSION > 5)
-/* This "if" allows PECL builds from this file to be portable to older PHP releases */
-const
-#endif
-zend_function_entry php_oci_functions[] = {
+static const zend_function_entry php_oci_functions[] = {
 	PHP_FE(oci_define_by_name,			arginfo_oci_define_by_name)
 	PHP_FE(oci_bind_by_name,			arginfo_oci_bind_by_name)
 	PHP_FE(oci_bind_array_by_name,		arginfo_oci_bind_array_by_name)
@@ -909,9 +779,8 @@ zend_function_entry php_oci_functions[] = {
 	PHP_FE(oci_new_descriptor,			arginfo_oci_new_descriptor)
 	PHP_FE(oci_set_prefetch,			arginfo_oci_set_prefetch)
 	PHP_FE(oci_set_client_identifier,	arginfo_oci_set_client_identifier)
-#ifdef WAITIING_ORACLE_BUG_16695981_FIX
 	PHP_FE(oci_set_db_operation,		arginfo_oci_set_db_operation)
-#endif
+	PHP_FE(oci_set_call_timeout,		arginfo_oci_set_call_timeout)
 	PHP_FE(oci_set_edition,				arginfo_oci_set_edition)
 	PHP_FE(oci_set_module_name,			arginfo_oci_set_module_name)
 	PHP_FE(oci_set_action,				arginfo_oci_set_action)
@@ -926,6 +795,8 @@ zend_function_entry php_oci_functions[] = {
 	PHP_FE(oci_collection_max,			arginfo_oci_collection_max)
 	PHP_FE(oci_collection_trim,			arginfo_oci_collection_trim)
 	PHP_FE(oci_new_collection,			arginfo_oci_new_collection)
+	PHP_FE(oci_register_taf_callback,   arginfo_oci_register_taf_callback)
+	PHP_FE(oci_unregister_taf_callback, arginfo_oci_unregister_taf_callback)
 
 	PHP_FALIAS(oci_free_cursor,		oci_free_statement,		arginfo_oci_free_statement)
 	PHP_FALIAS(ocifreecursor,		oci_free_statement,		arginfo_oci_free_statement)
@@ -974,19 +845,10 @@ zend_function_entry php_oci_functions[] = {
 	PHP_FALIAS(ocicollsize,			oci_collection_size,	arginfo_oci_collection_size)
 	PHP_FALIAS(ocicollmax,			oci_collection_max,		arginfo_oci_collection_max)
 	PHP_FALIAS(ocicolltrim,			oci_collection_trim,	arginfo_oci_collection_trim)
-#if (PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION == 3 && PHP_RELEASE_VERSION >= 7) || (PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION >= 4) || (PHP_MAJOR_VERSION > 5)
 	PHP_FE_END
-#else
-	{NULL,NULL,NULL}
-#endif
 };
 
-static
-#if (PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION > 2) || (PHP_MAJOR_VERSION > 5)
-/* This "if" allows PECL builds from this file to be portable to older PHP releases */
-const
-#endif
-zend_function_entry php_oci_lob_class_functions[] = {
+static const zend_function_entry php_oci_lob_class_functions[] = {
 	PHP_FALIAS(load,		oci_lob_load,			arginfo_oci_lob_load_method)
 	PHP_FALIAS(tell,		oci_lob_tell,			arginfo_oci_lob_tell_method)
 	PHP_FALIAS(truncate,	oci_lob_truncate,		arginfo_oci_lob_truncate_method)
@@ -1009,19 +871,10 @@ zend_function_entry php_oci_lob_class_functions[] = {
 	PHP_FALIAS(save,		oci_lob_save,			arginfo_oci_lob_save_method)
 	PHP_FALIAS(savefile,	oci_lob_import,			arginfo_oci_lob_import_method)
 	PHP_FALIAS(free,		oci_free_descriptor,	arginfo_oci_free_descriptor_method)
-#if (PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION == 3 && PHP_RELEASE_VERSION >= 7) || (PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION >= 4) || (PHP_MAJOR_VERSION > 5)
 	PHP_FE_END
-#else
-	{NULL,NULL,NULL}
-#endif
 };
 
-static
-#if (PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION > 2) || (PHP_MAJOR_VERSION > 5)
-/* This "if" allows PECL builds from this file to be portable to older PHP releases */
-const
-#endif
-zend_function_entry php_oci_coll_class_functions[] = {
+static const zend_function_entry php_oci_coll_class_functions[] = {
 	PHP_FALIAS(append,		  oci_collection_append,			arginfo_oci_collection_append_method)
 	PHP_FALIAS(getelem,		  oci_collection_element_get,		arginfo_oci_collection_element_get_method)
 	PHP_FALIAS(assignelem,	  oci_collection_element_assign,	arginfo_oci_collection_element_assign_method)
@@ -1030,11 +883,7 @@ zend_function_entry php_oci_coll_class_functions[] = {
 	PHP_FALIAS(max,			  oci_collection_max,				arginfo_oci_collection_max_method)
 	PHP_FALIAS(trim,		  oci_collection_trim,				arginfo_oci_collection_trim_method)
 	PHP_FALIAS(free,		  oci_free_collection,				arginfo_oci_collection_free_method)
-#if (PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION == 3 && PHP_RELEASE_VERSION >= 7) || (PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION >= 4) || (PHP_MAJOR_VERSION > 5)
 	PHP_FE_END
-#else
-	{NULL,NULL,NULL}
-#endif
 };
 
 zend_module_entry oci8_module_entry = {
@@ -1057,12 +906,12 @@ zend_module_entry oci8_module_entry = {
 
 /* {{{ PHP_INI */
 PHP_INI_BEGIN()
-	STD_PHP_INI_ENTRY(	"oci8.max_persistent",			"-1",	PHP_INI_SYSTEM,	ONUPDATELONGFUNC,	max_persistent,			zend_oci_globals,	oci_globals)
-	STD_PHP_INI_ENTRY(	"oci8.persistent_timeout",		"-1",	PHP_INI_SYSTEM,	ONUPDATELONGFUNC,	persistent_timeout,		zend_oci_globals,	oci_globals)
-	STD_PHP_INI_ENTRY(	"oci8.ping_interval",			"60",	PHP_INI_SYSTEM,	ONUPDATELONGFUNC,	ping_interval,			zend_oci_globals,	oci_globals)
+	STD_PHP_INI_ENTRY(	"oci8.max_persistent",			"-1",	PHP_INI_SYSTEM,	OnUpdateLong,	max_persistent,			zend_oci_globals,	oci_globals)
+	STD_PHP_INI_ENTRY(	"oci8.persistent_timeout",		"-1",	PHP_INI_SYSTEM,	OnUpdateLong,	persistent_timeout,		zend_oci_globals,	oci_globals)
+	STD_PHP_INI_ENTRY(	"oci8.ping_interval",			"60",	PHP_INI_SYSTEM,	OnUpdateLong,	ping_interval,			zend_oci_globals,	oci_globals)
 	STD_PHP_INI_BOOLEAN("oci8.privileged_connect",		"0",	PHP_INI_SYSTEM,	OnUpdateBool,		privileged_connect,		zend_oci_globals,	oci_globals)
-	STD_PHP_INI_ENTRY(	"oci8.statement_cache_size",	"20",	PHP_INI_SYSTEM,	ONUPDATELONGFUNC,	statement_cache_size,	zend_oci_globals,	oci_globals)
-	STD_PHP_INI_ENTRY(	"oci8.default_prefetch",		"100",	PHP_INI_SYSTEM,	ONUPDATELONGFUNC,	default_prefetch,		zend_oci_globals,	oci_globals)
+	STD_PHP_INI_ENTRY(	"oci8.statement_cache_size",	"20",	PHP_INI_SYSTEM,	OnUpdateLong,	statement_cache_size,	zend_oci_globals,	oci_globals)
+	STD_PHP_INI_ENTRY(	"oci8.default_prefetch",		"100",	PHP_INI_SYSTEM,	OnUpdateLong,	default_prefetch,		zend_oci_globals,	oci_globals)
 	STD_PHP_INI_BOOLEAN("oci8.old_oci_close_semantics",	"0",	PHP_INI_SYSTEM,	OnUpdateBool,		old_oci_close_semantics,zend_oci_globals,	oci_globals)
 #if (OCI_MAJOR_VERSION >= 11)
 	STD_PHP_INI_ENTRY(	"oci8.connection_class",		"",		PHP_INI_ALL,	OnUpdateString,		connection_class,		zend_oci_globals,	oci_globals)
@@ -1084,7 +933,7 @@ static void php_oci_init_global_handles(void)
 {
 	sword errstatus;
 	sb4   ora_error_code = 0;
-	text  tmp_buf[OCI_ERROR_MAXMSG_SIZE];  /* Use traditional smaller size: non-PL/SQL errors should fit and it keeps the stack smaller */
+	text  tmp_buf[PHP_OCI_ERRBUF_LEN];  /* Use traditional smaller size: non-PL/SQL errors should fit and it keeps the stack smaller */
 
 	errstatus = OCIEnvNlsCreate(&OCI_G(env), PHP_OCI_INIT_MODE, 0, NULL, NULL, NULL, 0, NULL, 0, 0);
 
@@ -1095,7 +944,7 @@ static void php_oci_init_global_handles(void)
 		php_error_docref(NULL, E_WARNING, "OCIEnvNlsCreate() failed. There is something wrong with your system - please check that ORACLE_HOME and " PHP_OCI8_LIB_PATH_MSG " are set and point to the right directories");
 #endif
 		if (OCI_G(env)
-			&& OCIErrorGet(OCI_G(env), (ub4)1, NULL, &ora_error_code, tmp_buf, (ub4)OCI_ERROR_MAXMSG_SIZE, (ub4)OCI_HTYPE_ENV) == OCI_SUCCESS
+			&& OCIErrorGet(OCI_G(env), (ub4)1, NULL, &ora_error_code, tmp_buf, (ub4)PHP_OCI_ERRBUF_LEN, (ub4)OCI_HTYPE_ENV) == OCI_SUCCESS
 			&& *tmp_buf) {
 			php_error_docref(NULL, E_WARNING, "%s", tmp_buf);
 		}
@@ -1124,10 +973,10 @@ static void php_oci_init_global_handles(void)
 		PHP_OCI_CALL(OCIHandleFree, (cpoolh, OCI_HTYPE_CPOOL));
 #endif
 	} else {
-		OCIErrorGet(OCI_G(env), (ub4)1, NULL, &ora_error_code, tmp_buf, (ub4)OCI_ERROR_MAXMSG_SIZE, (ub4)OCI_HTYPE_ERROR);
+		OCIErrorGet(OCI_G(env), (ub4)1, NULL, &ora_error_code, tmp_buf, (ub4)PHP_OCI_ERRBUF_LEN, (ub4)OCI_HTYPE_ERROR);
 
 		if (ora_error_code) {
-			int tmp_buf_len = strlen((char *)tmp_buf);
+			int tmp_buf_len = (int) strlen((char *)tmp_buf);
 
 			if (tmp_buf_len > 0 && tmp_buf[tmp_buf_len - 1] == '\n') {
 				tmp_buf[tmp_buf_len - 1] = '\0';
@@ -1294,6 +1143,20 @@ PHP_MINIT_FUNCTION(oci)
 	REGISTER_LONG_CONSTANT("OCI_TEMP_CLOB",OCI_TEMP_CLOB, CONST_CS | CONST_PERSISTENT);
 	REGISTER_LONG_CONSTANT("OCI_TEMP_BLOB",OCI_TEMP_BLOB, CONST_CS | CONST_PERSISTENT);
 
+/* for Transparent Application Failover */
+	REGISTER_LONG_CONSTANT("OCI_FO_END", OCI_FO_END, CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("OCI_FO_ABORT", OCI_FO_ABORT, CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("OCI_FO_REAUTH", OCI_FO_REAUTH, CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("OCI_FO_BEGIN", OCI_FO_BEGIN, CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("OCI_FO_ERROR", OCI_FO_ERROR, CONST_CS | CONST_PERSISTENT);
+
+	REGISTER_LONG_CONSTANT("OCI_FO_NONE", OCI_FO_NONE, CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("OCI_FO_SESSION", OCI_FO_SESSION, CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("OCI_FO_SELECT", OCI_FO_SELECT, CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("OCI_FO_TXNAL", OCI_FO_TXNAL, CONST_CS | CONST_PERSISTENT);
+
+	REGISTER_LONG_CONSTANT("OCI_FO_RETRY", OCI_FO_RETRY, CONST_CS | CONST_PERSISTENT);
+
 	return SUCCESS;
 }
 
@@ -1321,7 +1184,7 @@ PHP_RSHUTDOWN_FUNCTION(oci)
 	 * unable to process a pconnection because of a refcount, the processing would happen from
 	 * np-destructor which is called when refcount goes to zero - php_oci_pconnection_list_np_dtor
 	 */
-	zend_hash_apply(&EG(persistent_list), (apply_func_t) php_oci_persistent_helper);
+	zend_hash_apply(&EG(persistent_list), php_oci_persistent_helper);
 
 	if (OCI_G(edition)) {
 		efree(OCI_G(edition));
@@ -1334,7 +1197,7 @@ PHP_MINFO_FUNCTION(oci)
 {
 	char buf[32];
 #if ((OCI_MAJOR_VERSION > 10) || ((OCI_MAJOR_VERSION == 10) && (OCI_MINOR_VERSION >= 2)))
-	char *ver;
+	char ver[256];
 #endif
 
 	php_info_print_table_start();
@@ -1345,12 +1208,10 @@ PHP_MINFO_FUNCTION(oci)
 	php_info_print_table_row(2, "OCI8 DTrace Support", "disabled");
 #endif
 	php_info_print_table_row(2, "OCI8 Version", PHP_OCI8_VERSION);
-	php_info_print_table_row(2, "Revision", "$Id$");
 
 #if ((OCI_MAJOR_VERSION > 10) || ((OCI_MAJOR_VERSION == 10) && (OCI_MINOR_VERSION >= 2)))
-	php_oci_client_get_version(&ver);
+	php_oci_client_get_version(ver, sizeof(ver));
 	php_info_print_table_row(2, "Oracle Run-time Client Library Version", ver);
-	efree(ver);
 #else
 	php_info_print_table_row(2, "Oracle Run-time Client Library Version", "Unknown");
 #endif
@@ -1383,9 +1244,9 @@ PHP_MINFO_FUNCTION(oci)
 
 	php_info_print_table_start();
 	php_info_print_table_header(2, "Statistics", "");
-	snprintf(buf, sizeof(buf), "%pd", OCI_G(num_persistent));
+	snprintf(buf, sizeof(buf), ZEND_LONG_FMT, OCI_G(num_persistent));
 	php_info_print_table_row(2, "Active Persistent Connections", buf);
-	snprintf(buf, sizeof(buf), "%pd", OCI_G(num_links));
+	snprintf(buf, sizeof(buf), ZEND_LONG_FMT, OCI_G(num_links));
 	php_info_print_table_row(2, "Active Connections", buf);
 	php_info_print_table_end();
 }
@@ -1453,14 +1314,16 @@ static void php_oci_pconnection_list_np_dtor(zend_resource *entry)
 		OCI_G(in_call)) {
 
 		/* Remove the hash entry if present */
-		zvp = zend_hash_find(&EG(persistent_list), connection->hash_key);
-		le = Z_RES_P(zvp); 		/* PHPNG TODO check for null zvp */
-		if (le != NULL && le->type == le_pconnection && le->ptr == connection) {
-			zend_hash_del(&EG(persistent_list), connection->hash_key);
-		}
-		else {
-			php_oci_connection_close(connection);
-			OCI_G(num_persistent)--;
+		if (connection->hash_key) {
+			zvp = zend_hash_find(&EG(persistent_list), connection->hash_key);
+			le = zvp ? Z_RES_P(zvp) : NULL;
+			if (le != NULL && le->type == le_pconnection && le->ptr == connection) {
+				zend_hash_del(&EG(persistent_list), connection->hash_key);
+			}
+			else {
+				php_oci_connection_close(connection);
+				OCI_G(num_persistent)--;
+			}
 		}
 
 #ifdef HAVE_OCI8_DTRACE
@@ -1530,16 +1393,18 @@ static void php_oci_collection_list_dtor(zend_resource *entry)
  *
  * Define hash destructor
  */
-void php_oci_define_hash_dtor(void *data)
+void php_oci_define_hash_dtor(zval *data)
 {
-	php_oci_define *define = (php_oci_define *) data;
-
-	zval_ptr_dtor(&define->zval);
+	php_oci_define *define = (php_oci_define *) Z_PTR_P(data);
 
 	if (define->name) {
 		efree(define->name);
 		define->name = NULL;
 	}
+
+	zval_ptr_dtor(&define->val);
+
+    efree(define);
 }
 /* }}} */
 
@@ -1547,23 +1412,31 @@ void php_oci_define_hash_dtor(void *data)
  *
  * Bind hash destructor
  */
-void php_oci_bind_hash_dtor(void *data)
+void php_oci_bind_hash_dtor(zval *data)
 {
-	php_oci_bind *bind = (php_oci_bind *) data;
+	php_oci_bind *bind = (php_oci_bind *) Z_PTR_P(data);
+
+	if (!Z_ISUNDEF(bind->val)) {
+		zval_ptr_dtor(&bind->val);
+		ZVAL_UNDEF(&bind->val);
+	}
 
 	if (bind->array.elements) {
 		efree(bind->array.elements);
+		bind->array.elements = NULL;
 	}
 
 	if (bind->array.element_lengths) {
 		efree(bind->array.element_lengths);
+		bind->array.element_lengths = NULL;
 	}
 
 	if (bind->array.indicators) {
 		efree(bind->array.indicators);
+		bind->array.indicators = NULL;
 	}
 
-	zval_ptr_dtor(&bind->zval);
+	efree(bind);
 }
 /* }}} */
 
@@ -1571,17 +1444,21 @@ void php_oci_bind_hash_dtor(void *data)
  *
  * Column hash destructor
  */
-void php_oci_column_hash_dtor(void *data)
+void php_oci_column_hash_dtor(zval *data)
 {
-	php_oci_out_column *column = (php_oci_out_column *) data;
+	php_oci_out_column *column = (php_oci_out_column *) Z_PTR_P(data);
 
-	/* if (column->stmtid) { */ /* PHPNG TODO */
+	if (column->stmtid) {
 		zend_list_close(column->stmtid);
-	/* } */
+	}
 
-	/* if (column->is_descr) { */ /* PHPNG TODO */
-		zend_list_close(column->descid);
-	/* } */
+	if (column->descid) {
+		if (GC_REFCOUNT(column->descid) == 1)
+			zend_list_close(column->descid);
+		else {
+			GC_DELREF(column->descid);
+		}
+	}
 
 	if (column->data) {
 		efree(column->data);
@@ -1590,6 +1467,8 @@ void php_oci_column_hash_dtor(void *data)
 	if (column->name) {
 		efree(column->name);
 	}
+
+	efree(column);
 }
 /* }}} */
 
@@ -1597,9 +1476,9 @@ void php_oci_column_hash_dtor(void *data)
  *
  * Flush descriptors on commit
  */
-void php_oci_descriptor_flush_hash_dtor(void *data)
+void php_oci_descriptor_flush_hash_dtor(zval *data)
 {
-	php_oci_descriptor *descriptor = *(php_oci_descriptor **)data;
+	php_oci_descriptor *descriptor = (php_oci_descriptor *) Z_PTR_P(data);
 
 	if (descriptor && descriptor->buffering == PHP_OCI_LOB_BUFFER_USED && (descriptor->type == OCI_DTYPE_LOB || descriptor->type == OCI_DTYPE_FILE)) {
 		php_oci_lob_flush(descriptor, OCI_LOB_BUFFER_FREE);
@@ -1631,17 +1510,16 @@ void php_oci_connection_descriptors_free(php_oci_connection *connection)
  */
 sb4 php_oci_error(OCIError *err_p, sword errstatus)
 {
-	text *errbuf = (text *)NULL;
+	text errbuf[PHP_OCI_ERRBUF_LEN];
 	sb4 errcode = 0; /* Oracle error number */
 
 	switch (errstatus) {
 		case OCI_SUCCESS:
 			break;
 		case OCI_SUCCESS_WITH_INFO:
-			errcode = php_oci_fetch_errmsg(err_p, &errbuf);
-			if (errbuf) {
+			errcode = php_oci_fetch_errmsg(err_p, errbuf, sizeof(errbuf));
+			if (errcode) {
 				php_error_docref(NULL, E_WARNING, "OCI_SUCCESS_WITH_INFO: %s", errbuf);
-				efree(errbuf);
 			} else {
 				php_error_docref(NULL, E_WARNING, "OCI_SUCCESS_WITH_INFO: failed to fetch error message");
 			}
@@ -1650,19 +1528,17 @@ sb4 php_oci_error(OCIError *err_p, sword errstatus)
 			php_error_docref(NULL, E_WARNING, "OCI_NEED_DATA");
 			break;
 		case OCI_NO_DATA:
-			errcode = php_oci_fetch_errmsg(err_p, &errbuf);
-			if (errbuf) {
+			errcode = php_oci_fetch_errmsg(err_p, errbuf, sizeof(errbuf));
+			if (errcode) {
 				php_error_docref(NULL, E_WARNING, "%s", errbuf);
-				efree(errbuf);
 			} else {
 				php_error_docref(NULL, E_WARNING, "OCI_NO_DATA: failed to fetch error message");
 			}
 			break;
 		case OCI_ERROR:
-			errcode = php_oci_fetch_errmsg(err_p, &errbuf);
-			if (errbuf) {
+			errcode = php_oci_fetch_errmsg(err_p, errbuf, sizeof(errbuf));
+			if (errcode) {
 				php_error_docref(NULL, E_WARNING, "%s", errbuf);
-				efree(errbuf);
 			} else {
 				php_error_docref(NULL, E_WARNING, "failed to fetch error message");
 			}
@@ -1695,23 +1571,17 @@ sb4 php_oci_error(OCIError *err_p, sword errstatus)
  *
  * Fetch error message into the buffer from the error handle provided
  */
-sb4 php_oci_fetch_errmsg(OCIError *error_handle, text **error_buf)
+sb4 php_oci_fetch_errmsg(OCIError *error_handle, text *error_buf, size_t error_buf_size)
 {
 	sb4 error_code = 0;
-	text err_buf[PHP_OCI_ERRBUF_LEN];
 
-	memset(err_buf, 0, sizeof(err_buf));
-	PHP_OCI_CALL(OCIErrorGet, (error_handle, (ub4)1, NULL, &error_code, err_buf, (ub4)PHP_OCI_ERRBUF_LEN, (ub4)OCI_HTYPE_ERROR));
+	PHP_OCI_CALL(OCIErrorGet, (error_handle, (ub4)1, NULL, &error_code, error_buf, (ub4)error_buf_size, (ub4)OCI_HTYPE_ERROR));
 
 	if (error_code) {
-		int err_buf_len = strlen((char *)err_buf);
+		int err_buf_len = (int) strlen((char *)error_buf);
 
-		if (err_buf_len && err_buf[err_buf_len - 1] == '\n') {
-			err_buf[err_buf_len - 1] = '\0';
-		}
-		if (err_buf_len && error_buf) {
-			*error_buf = NULL;
-			*error_buf = (text *)estrndup((char *)err_buf, err_buf_len);
+		if (err_buf_len && error_buf[err_buf_len - 1] == '\n') {
+			error_buf[err_buf_len - 1] = '\0';
 		}
 	}
 	return error_code;
@@ -1761,9 +1631,14 @@ void php_oci_do_connect(INTERNAL_FUNCTION_PARAMETERS, int persistent, int exclus
 	zend_long session_mode = OCI_DEFAULT;
 
 	/* if a fourth parameter is handed over, it is the charset identifier (but is only used in Oracle 9i+) */
-	if (zend_parse_parameters(ZEND_NUM_ARGS(), "ss|ssl", &username, &username_len, &password, &password_len, &dbname, &dbname_len, &charset, &charset_len, &session_mode) == FAILURE) {
-		return;
-	}
+	ZEND_PARSE_PARAMETERS_START(2, 5)
+		Z_PARAM_STRING(username, username_len)
+		Z_PARAM_STRING(password, password_len)
+		Z_PARAM_OPTIONAL
+		Z_PARAM_STRING(dbname, dbname_len)
+		Z_PARAM_STRING(charset, charset_len)
+		Z_PARAM_LONG(session_mode)
+	ZEND_PARSE_PARAMETERS_END();
 
 #ifdef HAVE_OCI8_DTRACE
 	if (DTRACE_OCI8_CONNECT_ENTRY_ENABLED()) {
@@ -1775,7 +1650,7 @@ void php_oci_do_connect(INTERNAL_FUNCTION_PARAMETERS, int persistent, int exclus
 		charset = NULL;
 	}
 
-	connection = php_oci_do_connect_ex(username, username_len, password, password_len, NULL, 0, dbname, dbname_len, charset, session_mode, persistent, exclusive);
+	connection = php_oci_do_connect_ex(username, (int) username_len, password, (int) password_len, NULL, 0, dbname, (int) dbname_len, charset, session_mode, persistent, exclusive);
 
 #ifdef HAVE_OCI8_DTRACE
 	if (DTRACE_OCI8_CONNECT_RETURN_ENABLED()) {
@@ -1813,7 +1688,7 @@ php_oci_connection *php_oci_do_connect_ex(char *username, int username_len, char
 	ub2 charsetid_nls_lang = 0;
 
 	if (session_mode & ~(OCI_SYSOPER | OCI_SYSDBA | PHP_OCI_CRED_EXT)) {
-		php_error_docref(NULL, E_WARNING, "Invalid session mode specified (%pd)", session_mode);
+		php_error_docref(NULL, E_WARNING, "Invalid session mode specified (" ZEND_LONG_FMT ")", session_mode);
 		return NULL;
 	}
 	if (session_mode & (OCI_SYSOPER | OCI_SYSDBA | PHP_OCI_CRED_EXT)) {
@@ -1843,13 +1718,6 @@ php_oci_connection *php_oci_do_connect_ex(char *username, int username_len, char
 				php_error_docref(NULL, E_WARNING, "Privileged connect is disabled. Enable oci8.privileged_connect to be able to connect as SYSOPER or SYSDBA");
 				return NULL;
 			}
-#if (PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION < 4) || (PHP_MAJOR_VERSION < 5)
-			/* Safe mode has been removed in PHP 5.4 */
-			if (PG(safe_mode)) {
-				php_error_docref(NULL, E_WARNING, "Privileged connect is disabled in Safe Mode");
-				return NULL;
-			}
-#endif
 		}
 	}
 
@@ -1922,16 +1790,18 @@ php_oci_connection *php_oci_do_connect_ex(char *username, int username_len, char
 	timestamp = time(NULL);
 
 	smart_str_append_unsigned_ex(&hashed_details, session_mode, 0);
+	if (persistent) {
+		smart_str_appendl_ex(&hashed_details, "pc", sizeof("pc") - 1, 0);
+	}
+
 	smart_str_0(&hashed_details);
 
 	/* make it lowercase */
-	/* PHPNG TODO is this safe to do? What about interned strings? */
-	php_strtolower(hashed_details.s->val, hashed_details.s->len);
+	php_strtolower(ZSTR_VAL(hashed_details.s), ZSTR_LEN(hashed_details.s));
 
 	if (!exclusive && !new_password) {
 		zend_bool found = 0;
 
-		/* PHPNG TODO Check hashed_details is used correctly */
 		if (persistent && ((zvp = zend_hash_find(&EG(persistent_list), hashed_details.s))) != NULL) {
 			zend_resource *le = Z_RES_P(zvp);
 
@@ -1944,12 +1814,11 @@ php_oci_connection *php_oci_do_connect_ex(char *username, int username_len, char
 			le = Z_RES_P(zvp);
 			found = 1;
 			if (le->type == le_index_ptr) {
-				int type, link;
-				void *ptr;
+				zend_resource *ptr;
 
-				ptr = le->ptr; /* PHPNG TODO */
-				if (ptr && (le->type == le_connection)) {
-					connection = (php_oci_connection *)ptr;
+				ptr = (zend_resource *) le->ptr;
+				if (ptr && (ptr->type == le_connection)) {
+					connection = (php_oci_connection *)ptr->ptr;
 				}
 			}
 		}
@@ -1968,7 +1837,7 @@ php_oci_connection *php_oci_do_connect_ex(char *username, int username_len, char
 		 * TODO: put in negative code for non-persistent stubs
 		 */
 		if (connection && connection->is_persistent && connection->is_stub) {
-			if (php_oci_create_session(connection, NULL, dbname, dbname_len, username, username_len, password, password_len, new_password, new_password_len, session_mode)) {
+			if (php_oci_create_session(connection, NULL, dbname, dbname_len, username, username_len, password, password_len, new_password, new_password_len, (int) session_mode)) {
 				smart_str_free(&hashed_details);
 				zend_hash_del(&EG(persistent_list), connection->hash_key);
 
@@ -1982,7 +1851,6 @@ php_oci_connection *php_oci_do_connect_ex(char *username, int username_len, char
 			if (connection->is_open) {
 				/* found an open connection. now ping it */
 				if (connection->is_persistent) {
-					int rsrc_type;
 
 					/* Check connection liveness in the following order:
 					 * 1) always check OCI_ATTR_SERVER_STATUS
@@ -2000,15 +1868,24 @@ php_oci_connection *php_oci_do_connect_ex(char *username, int username_len, char
 						if (!ping_done && (*(connection->next_pingp) > 0) && (timestamp >= *(connection->next_pingp)) && !php_oci_connection_ping(connection)) {
 							/* server died */
 						} else {
-							php_oci_connection *tmp;
+							php_oci_connection *tmp = (php_oci_connection *) NULL;
+							zval *tmp_val = (zval *) NULL;
 
 							/* okay, the connection is open and the server is still alive */
 							connection->used_this_request = 1;
-							tmp = (php_oci_connection *)connection->id->ptr;
+							if (connection->id) {
+								tmp_val = zend_hash_index_find(&EG(regular_list), connection->id->handle);
+								if ((tmp_val != NULL) && (Z_TYPE_P(tmp_val) == IS_RESOURCE)) {
+									tmp = Z_RES_VAL_P(tmp_val);
+								}
 
-							if (tmp != NULL && rsrc_type == le_pconnection && tmp->hash_key->len == hashed_details.s->len &&
-								memcmp(tmp->hash_key->val, hashed_details.s->val, tmp->hash_key->len) == 0 && ++GC_REFCOUNT(connection->id) == SUCCESS) {
-								/* do nothing */
+								if ((tmp_val != NULL) && (tmp != NULL) &&
+									(ZSTR_LEN(tmp->hash_key) == ZSTR_LEN(hashed_details.s)) &&
+									(memcmp(ZSTR_VAL(tmp->hash_key), ZSTR_VAL(hashed_details.s),
+									 ZSTR_LEN(tmp->hash_key)) == 0)) {
+									connection = tmp;
+									GC_ADDREF(connection->id);
+								}
 							} else {
 								PHP_OCI_REGISTER_RESOURCE(connection, le_pconnection);
 								/* Persistent connections: For old close semantics we artificially
@@ -2017,7 +1894,7 @@ php_oci_connection *php_oci_do_connect_ex(char *username, int username_len, char
 								 * decremented in the persistent helper
 								 */
 								if (OCI_G(old_oci_close_semantics)) {
-									++GC_REFCOUNT(connection->id);
+									GC_ADDREF(connection->id);
 								}
 							}
 							smart_str_free(&hashed_details);
@@ -2028,7 +1905,7 @@ php_oci_connection *php_oci_do_connect_ex(char *username, int username_len, char
 				} else {
 					/* we do not ping non-persistent connections */
 					smart_str_free(&hashed_details);
-					++GC_REFCOUNT(connection->id);
+					GC_ADDREF(connection->id);
 					return connection;
 				}
 			} /* is_open is true? */
@@ -2037,7 +1914,6 @@ php_oci_connection *php_oci_do_connect_ex(char *username, int username_len, char
 			 * if ping fails
 			 */
 			if (persistent){
-				int rsrc_type;
 
 				connection->is_open = 0;
 				connection->used_this_request = 1;
@@ -2045,7 +1921,7 @@ php_oci_connection *php_oci_do_connect_ex(char *username, int username_len, char
 				/* We have to do a hash_del but need to preserve the resource if there is a positive
 				 * refcount. Set the data pointer in the list entry to NULL
 				 */
-				if (connection == connection->id->ptr && rsrc_type == le_pconnection) {
+				if (connection == connection->id->ptr) {
 					le->ptr = NULL;
 				}
 
@@ -2076,11 +1952,11 @@ php_oci_connection *php_oci_do_connect_ex(char *username, int username_len, char
 
 		if (OCI_G(max_persistent) != -1 && OCI_G(num_persistent) >= OCI_G(max_persistent)) {
 			/* try to find an idle connection and kill it */
-			zend_hash_apply(&EG(persistent_list), (apply_func_t) php_oci_persistent_helper);
+			zend_hash_apply(&EG(persistent_list), php_oci_persistent_helper);
 
 			if (OCI_G(max_persistent) != -1 && OCI_G(num_persistent) >= OCI_G(max_persistent)) {
 				/* all persistent connactions are in use, fallback to non-persistent connection creation */
-				php_error_docref(NULL, E_NOTICE, "Too many open persistent connections (%pd)", OCI_G(num_persistent));
+				php_error_docref(NULL, E_NOTICE, "Too many open persistent connections (" ZEND_LONG_FMT ")", OCI_G(num_persistent));
 				alloc_non_persistent = 1;
 			}
 		}
@@ -2089,6 +1965,7 @@ php_oci_connection *php_oci_do_connect_ex(char *username, int username_len, char
 			connection = (php_oci_connection *) ecalloc(1, sizeof(php_oci_connection));
 			connection->hash_key = zend_string_dup(hashed_details.s, 0);
 			connection->is_persistent = 0;
+			ZVAL_UNDEF(&connection->taf_callback);
 #ifdef HAVE_OCI8_DTRACE
 			connection->client_id = NULL;
 #endif
@@ -2103,6 +1980,7 @@ php_oci_connection *php_oci_do_connect_ex(char *username, int username_len, char
 				return NULL;
 			}
 			connection->is_persistent = 1;
+			ZVAL_UNDEF(&connection->taf_callback);
 #ifdef HAVE_OCI8_DTRACE
 			connection->client_id = NULL;
 #endif
@@ -2111,6 +1989,7 @@ php_oci_connection *php_oci_do_connect_ex(char *username, int username_len, char
 		connection = (php_oci_connection *) ecalloc(1, sizeof(php_oci_connection));
 		connection->hash_key = zend_string_dup(hashed_details.s, 0);
 		connection->is_persistent = 0;
+		ZVAL_UNDEF(&connection->taf_callback);
 #ifdef HAVE_OCI8_DTRACE
 		connection->client_id = NULL;
 #endif
@@ -2151,13 +2030,13 @@ php_oci_connection *php_oci_do_connect_ex(char *username, int username_len, char
 	 * connect/password change
 	 */
 	if (!use_spool) {
-		if (php_oci_old_create_session(connection, dbname, dbname_len, username, username_len, password, password_len, new_password, new_password_len, session_mode)) {
+		if (php_oci_old_create_session(connection, dbname, dbname_len, username, username_len, password, password_len, new_password, new_password_len, (int) session_mode)) {
 			php_oci_connection_close(connection);
 			return NULL;
 		}
 	} else {
 		/* create using the client-side session pool */
-		if (php_oci_create_session(connection, session_pool, dbname, dbname_len, username, username_len, password, password_len, new_password, new_password_len, session_mode)) {
+		if (php_oci_create_session(connection, session_pool, dbname, dbname_len, username, username_len, password, password_len, new_password, new_password_len, (int) session_mode)) {
 			php_oci_connection_close(connection);
 			return NULL;
 		}
@@ -2168,8 +2047,10 @@ php_oci_connection *php_oci_do_connect_ex(char *username, int username_len, char
 
 	/* add to the appropriate hash */
 	if (connection->is_persistent) {
+#if PHP_VERSION_ID < 70300
 		new_le.ptr = connection;
 		new_le.type = le_pconnection;
+#endif
 		connection->used_this_request = 1;
 		PHP_OCI_REGISTER_RESOURCE(connection, le_pconnection);
 
@@ -2178,9 +2059,13 @@ php_oci_connection *php_oci_do_connect_ex(char *username, int username_len, char
 		 * refcount is decremented in the persistent helper
 		 */
 		if (OCI_G(old_oci_close_semantics)) {
-			++GC_REFCOUNT(connection->id);
+			GC_ADDREF(connection->id);
 		}
+#if PHP_VERSION_ID < 70300
 		zend_hash_update_mem(&EG(persistent_list), connection->hash_key, (void *)&new_le, sizeof(zend_resource));
+#else
+		zend_register_persistent_resource_ex(connection->hash_key, connection, le_pconnection);
+#endif
 		OCI_G(num_persistent)++;
 		OCI_G(num_links)++;
 	} else if (!exclusive) {
@@ -2233,10 +2118,10 @@ static int php_oci_connection_ping(php_oci_connection *connection)
 		return 1;
 	} else {
 		sb4 error_code = 0;
-		text tmp_buf[OCI_ERROR_MAXMSG_SIZE];
+		text tmp_buf[PHP_OCI_ERRBUF_LEN];
 
 		/* Treat ORA-1010 as a successful Ping */
-		OCIErrorGet(OCI_G(err), (ub4)1, NULL, &error_code, tmp_buf, (ub4)OCI_ERROR_MAXMSG_SIZE, (ub4)OCI_HTYPE_ERROR);
+		OCIErrorGet(OCI_G(err), (ub4)1, NULL, &error_code, tmp_buf, (ub4)PHP_OCI_ERRBUF_LEN, (ub4)OCI_HTYPE_ERROR);
 		if (error_code == 1010) {
 			return 1;
 		}
@@ -2367,16 +2252,32 @@ static int php_oci_connection_close(php_oci_connection *connection)
 	 * (like env) on the session pool
 	 */
 		php_oci_spool_close(connection->private_spool);
+		connection->private_spool = NULL;
+	}
+
+	if (GC_REFCOUNT(connection->hash_key) >= 2) {
+		zend_hash_del(&EG(regular_list), connection->hash_key);
 	}
 
 	if (connection->hash_key) {
 		pefree(connection->hash_key, connection->is_persistent);
+		connection->hash_key = NULL;
 	}
 #ifdef HAVE_OCI8_DTRACE
 	if (connection->client_id) {
 		pefree(connection->client_id, connection->is_persistent);
+		connection->client_id = NULL;
 	}
 #endif /* HAVE_OCI8_DTRACE */
+
+	if (!Z_ISUNDEF(connection->taf_callback)) {
+		/* If it's NULL, then its value should be freed already */
+		if (!Z_ISNULL(connection->taf_callback)) {
+			zval_ptr_dtor(&connection->taf_callback);
+		}
+		ZVAL_UNDEF(&connection->taf_callback);
+	}
+
 	pefree(connection, connection->is_persistent);
 	connection = NULL;
 	OCI_G(in_call) = in_call_save;
@@ -2472,6 +2373,9 @@ int php_oci_connection_release(php_oci_connection *connection)
 #endif /* HAVE_OCI8_DTRACE */
 	}
 
+	/* Always set id to null, so next time a new resource is being registered. */
+	connection->id = NULL;
+
 	OCI_G(in_call) = in_call_save;
 	return result;
 }
@@ -2502,9 +2406,8 @@ int php_oci_password_change(php_oci_connection *connection, char *user, int user
  *
  * Get Oracle client library version
  */
-void php_oci_client_get_version(char **version)
+void php_oci_client_get_version(char *version, size_t version_size)
 {
-	char  version_buff[256];
 #if ((OCI_MAJOR_VERSION > 10) || ((OCI_MAJOR_VERSION == 10) && (OCI_MINOR_VERSION >= 2)))	/* OCIClientVersion only available 10.2 onwards */
 	sword major_version = 0;
 	sword minor_version = 0;
@@ -2513,11 +2416,10 @@ void php_oci_client_get_version(char **version)
 	sword port_update_num = 0;
 
 	PHP_OCI_CALL(OCIClientVersion, (&major_version, &minor_version, &update_num, &patch_num, &port_update_num));
-	snprintf(version_buff, sizeof(version_buff), "%d.%d.%d.%d.%d", major_version, minor_version, update_num, patch_num, port_update_num);
+	snprintf(version, version_size, "%d.%d.%d.%d.%d", major_version, minor_version, update_num, patch_num, port_update_num);
 #else
-	memcpy(version_buff, "Unknown", sizeof("Unknown"));
+	memcpy(version, "Unknown", sizeof("Unknown"));
 #endif
-	*version = estrdup(version_buff);
 }
 /* }}} */
 
@@ -2525,12 +2427,11 @@ void php_oci_client_get_version(char **version)
  *
  * Get Oracle server version
  */
-int php_oci_server_get_version(php_oci_connection *connection, char **version)
+int php_oci_server_get_version(php_oci_connection *connection, char *version, size_t version_size)
 {
 	sword errstatus;
-	char version_buff[256];
 
-	PHP_OCI_CALL_RETURN(errstatus, OCIServerVersion, (connection->svc, connection->err, (text *)version_buff, sizeof(version_buff), OCI_HTYPE_SVCCTX));
+	PHP_OCI_CALL_RETURN(errstatus, OCIServerVersion, (connection->svc, connection->err, (text *)version, (ub4) version_size, OCI_HTYPE_SVCCTX));
 
 	if (errstatus != OCI_SUCCESS) {
 		connection->errcode = php_oci_error(connection->err, errstatus);
@@ -2538,7 +2439,6 @@ int php_oci_server_get_version(php_oci_connection *connection, char **version)
 		return 1;
 	}
 
-	*version = estrdup(version_buff);
 	return 0;
 }
 /* }}} */
@@ -2552,7 +2452,7 @@ int php_oci_column_to_zval(php_oci_out_column *column, zval *value, int mode)
 	php_oci_descriptor *descriptor;
 	ub4 lob_length;
 	int column_size;
-	char *lob_buffer;
+	char *lob_buffer = (char *)0;
 	int lob_fetch_status;
 
 	if (column->indicator == -1) { /* column is NULL */
@@ -2561,18 +2461,17 @@ int php_oci_column_to_zval(php_oci_out_column *column, zval *value, int mode)
 	}
 
 	if (column->is_cursor) { /* REFCURSOR -> simply return the statement id */
-		zend_register_resource(value, column->stmtid, 0); /* XXX type correct? */
-		++GC_REFCOUNT(column->stmtid);
+		ZVAL_RES(value, column->stmtid);
+		GC_ADDREF(column->stmtid);
 	} else if (column->is_descr) {
 
 		if (column->data_type != SQLT_RDD) {
-			int rsrc_type;
 
 			/* reset descriptor's length */
 			descriptor = (php_oci_descriptor *) column->descid->ptr;
 
-			if (!descriptor || rsrc_type != le_descriptor) {
-				php_error_docref(NULL, E_WARNING, "Unable to find LOB descriptor #%d", column->descid);
+			if (!descriptor) {
+				php_error_docref(NULL, E_WARNING, "Unable to find LOB descriptor #%d", column->descid->handle);
 				return 1;
 			}
 
@@ -2599,13 +2498,15 @@ int php_oci_column_to_zval(php_oci_out_column *column, zval *value, int mode)
 				} else {
 					ZVAL_EMPTY_STRING(value);
 				}
+				if (lob_buffer)
+					efree(lob_buffer);
 				return 0;
 			}
 		} else {
 			/* return the locator */
 			object_init_ex(value, oci_lob_class_entry_ptr);
 			add_property_resource(value, "descriptor", column->descid);
-			++GC_REFCOUNT(column->descid);
+			GC_ADDREF(column->descid);
 		}
 	} else {
 		switch (column->retcode) {
@@ -2638,6 +2539,8 @@ int php_oci_column_to_zval(php_oci_out_column *column, zval *value, int mode)
 void php_oci_fetch_row (INTERNAL_FUNCTION_PARAMETERS, int mode, int expected_args)
 {
 	zval *z_statement, *array;
+	zval *placeholder = (zval*) NULL;
+/*	zend_array *temp_array = (zend_array *) NULL;*/
 	php_oci_statement *statement;		  /* statement that will be fetched from */
 #if (OCI_MAJOR_VERSION >= 12)
 	php_oci_statement *invokedstatement;  /* statement this function was invoked with */
@@ -2650,19 +2553,30 @@ void php_oci_fetch_row (INTERNAL_FUNCTION_PARAMETERS, int mode, int expected_arg
 	if (expected_args > 2) {
 		/* only for ocifetchinto BC */
 
-		if (zend_parse_parameters(ZEND_NUM_ARGS(), "rz|l", &z_statement, &array, &fetch_mode) == FAILURE) {
-			return;
-		}
+		ZEND_PARSE_PARAMETERS_START(2, 3)
+			Z_PARAM_RESOURCE(z_statement)
+			Z_PARAM_ZVAL(array)
+			Z_PARAM_OPTIONAL
+			Z_PARAM_LONG(fetch_mode)
+		ZEND_PARSE_PARAMETERS_END();
 
 		if (ZEND_NUM_ARGS() == 2) {
 			fetch_mode = mode;
 		}
+
+		if (Z_ISREF_P(array))
+			placeholder = Z_REFVAL_P(array);
+		else
+			placeholder = array;
+
 	} else if (expected_args == 2) {
 		/* only for oci_fetch_array() */
 
-		if (zend_parse_parameters(ZEND_NUM_ARGS(), "r|l", &z_statement, &fetch_mode) == FAILURE) {
-			return;
-		}
+		ZEND_PARSE_PARAMETERS_START(1, 2)
+			Z_PARAM_RESOURCE(z_statement)
+			Z_PARAM_OPTIONAL
+			Z_PARAM_LONG(fetch_mode)
+		ZEND_PARSE_PARAMETERS_END();
 
 		if (ZEND_NUM_ARGS() == 1) {
 			fetch_mode = mode;
@@ -2670,9 +2584,9 @@ void php_oci_fetch_row (INTERNAL_FUNCTION_PARAMETERS, int mode, int expected_arg
 	} else {
 		/* for all oci_fetch_*() */
 
-		if (zend_parse_parameters(ZEND_NUM_ARGS(), "r", &z_statement) == FAILURE) {
-			return;
-		}
+		ZEND_PARSE_PARAMETERS_START(1, 1)
+			Z_PARAM_RESOURCE(z_statement)
+		ZEND_PARSE_PARAMETERS_END();
 
 		fetch_mode = mode;
 	}
@@ -2696,7 +2610,8 @@ void php_oci_fetch_row (INTERNAL_FUNCTION_PARAMETERS, int mode, int expected_arg
 #else /* OCI_MAJOR_VERSION */
 	PHP_OCI_ZVAL_TO_STATEMENT(z_statement, invokedstatement);
 
-	if (invokedstatement->impres_flag == PHP_OCI_IMPRES_NO_CHILDREN) {
+	if (invokedstatement->impres_flag == PHP_OCI_IMPRES_NO_CHILDREN ||
+        invokedstatement->impres_flag == PHP_OCI_IMPRES_IS_CHILD) {
 		/* Already know there are no Implicit Result Sets */
 	    statement = invokedstatement;
 	} else if (invokedstatement->impres_flag == PHP_OCI_IMPRES_HAS_CHILDREN) {
@@ -2745,7 +2660,13 @@ void php_oci_fetch_row (INTERNAL_FUNCTION_PARAMETERS, int mode, int expected_arg
     }
 #endif /* OCI_MAJOR_VERSION */
 
-	array_init(return_value);
+	if (placeholder == NULL) {
+		placeholder = return_value;
+	} else {
+		zval_ptr_dtor(placeholder);
+	}
+
+	array_init(placeholder);
 
 	for (i = 0; i < statement->ncolumns; i++) {
 
@@ -2761,32 +2682,29 @@ void php_oci_fetch_row (INTERNAL_FUNCTION_PARAMETERS, int mode, int expected_arg
 		if (!(column->indicator == -1)) {
 			zval element;
 
-			php_oci_column_to_zval(column, &element, fetch_mode);
+			php_oci_column_to_zval(column, &element, (int) fetch_mode);
 
 			if (fetch_mode & PHP_OCI_NUM || !(fetch_mode & PHP_OCI_ASSOC)) {
-				add_index_zval(return_value, i, &element);
+				add_index_zval(placeholder, i, &element);
 			}
 			if (fetch_mode & PHP_OCI_ASSOC) {
 				if (fetch_mode & PHP_OCI_NUM) {
-					Z_ADDREF(element);
+					Z_TRY_ADDREF_P(&element);
 				}
-				add_assoc_zval(return_value, column->name, &element);
+				add_assoc_zval(placeholder, column->name, &element);
 			}
 
 		} else {
 			if (fetch_mode & PHP_OCI_NUM || !(fetch_mode & PHP_OCI_ASSOC)) {
-				add_index_null(return_value, i);
+				add_index_null(placeholder, i);
 			}
 			if (fetch_mode & PHP_OCI_ASSOC) {
-				add_assoc_null(return_value, column->name);
+				add_assoc_null(placeholder, column->name);
 			}
 		}
 	}
 
 	if (expected_args > 2) {
-		/* Only for ocifetchinto BC.  In all other cases we return array, not long */
-		ZVAL_COPY_VALUE(array, return_value); /* copy return_value to given reference */
-		zval_dtor(return_value);
 		RETURN_LONG(statement->ncolumns);
 	}
 }
@@ -2797,8 +2715,9 @@ void php_oci_fetch_row (INTERNAL_FUNCTION_PARAMETERS, int mode, int expected_arg
  * Helper function to close/rollback persistent connections at the end of request. A return value of
  * 1 indicates that the connection is to be destroyed
  */
-static int php_oci_persistent_helper(zend_resource *le)
+static int php_oci_persistent_helper(zval *zv)
 {
+	zend_resource *le = Z_RES_P(zv);
 	time_t timestamp;
 	php_oci_connection *connection;
 
@@ -2807,6 +2726,11 @@ static int php_oci_persistent_helper(zend_resource *le)
 	/* Persistent connection stubs are also counted as they have private session pools */
 	if (le->type == le_pconnection) {
 		connection = (php_oci_connection *)le->ptr;
+
+		/* Remove TAF callback function as it's bound to current request */
+		if (connection->used_this_request && !Z_ISUNDEF(connection->taf_callback) && !Z_ISNULL(connection->taf_callback)) {
+			php_oci_unregister_taf_callback(connection);
+		}
 
 		if (!connection->used_this_request && OCI_G(persistent_timeout) != -1) {
 #ifdef HAVE_OCI8_DTRACE
@@ -2844,7 +2768,7 @@ static php_oci_spool *php_oci_create_spool(char *username, int username_len, cha
 	}
 
 	/* Populate key if passed */
-	if (hash_key->val) {
+	if (hash_key && (ZSTR_LEN(hash_key) > 0)) {
 		session_pool->spool_hash_key = zend_string_dup(hash_key, 1);
 		if (session_pool->spool_hash_key == NULL) {
 			iserror = 1;
@@ -2969,7 +2893,9 @@ static php_oci_spool *php_oci_get_spool(char *username, int username_len, char *
 {
 	smart_str spool_hashed_details = {0};
 	php_oci_spool *session_pool = NULL;
-	zend_resource spool_le = {0};
+#if PHP_VERSION_ID < 70300
+	zend_resource spool_le = {{0}};
+#endif
 	zend_resource *spool_out_le = NULL;
 	zend_bool iserror = 0;
 	zval *spool_out_zv = NULL;
@@ -3000,8 +2926,7 @@ static php_oci_spool *php_oci_get_spool(char *username, int username_len, char *
 	/* Session Pool Hash Key : oci8spool***username**edition**hashedpassword**dbname**charset */
 
 	smart_str_0(&spool_hashed_details);
-	/* PHPNG TODO is this safe to do? */
-	php_strtolower(spool_hashed_details.s->val, spool_hashed_details.s->len);
+	php_strtolower(ZSTR_VAL(spool_hashed_details.s), ZSTR_LEN(spool_hashed_details.s));
 	/* }}} */
 
 	spool_out_zv = zend_hash_find(&EG(persistent_list), spool_hashed_details.s);
@@ -3017,13 +2942,17 @@ static php_oci_spool *php_oci_get_spool(char *username, int username_len, char *
 			iserror = 1;
 			goto exit_get_spool;
 		}
+#if PHP_VERSION_ID < 70300
 		spool_le.ptr  = session_pool;
 		spool_le.type = le_psessionpool;
 		PHP_OCI_REGISTER_RESOURCE(session_pool, le_psessionpool);
 		zend_hash_update_mem(&EG(persistent_list), session_pool->spool_hash_key, (void *)&spool_le, sizeof(zend_resource));
+#else
+		zend_register_persistent_resource_ex(session_pool->spool_hash_key, session_pool, le_psessionpool);
+#endif
 	} else if (spool_out_le->type == le_psessionpool &&
-		((php_oci_spool *)(spool_out_le->ptr))->spool_hash_key->len == spool_hashed_details.s->len &&
-		memcmp(((php_oci_spool *)(spool_out_le->ptr))->spool_hash_key->val, spool_hashed_details.s->val, spool_hashed_details.s->len) == 0) {
+		ZSTR_LEN(((php_oci_spool *)(spool_out_le->ptr))->spool_hash_key) == ZSTR_LEN(spool_hashed_details.s) &&
+		memcmp(ZSTR_VAL(((php_oci_spool *)(spool_out_le->ptr))->spool_hash_key), ZSTR_VAL(spool_hashed_details.s), ZSTR_LEN(spool_hashed_details.s)) == 0) {
 		/* retrieve the cached session pool */
 		session_pool = (php_oci_spool *)(spool_out_le->ptr);
 	}
@@ -3053,7 +2982,7 @@ static OCIEnv *php_oci_create_env(ub2 charsetid)
 
 	if (OCI_G(errcode) != OCI_SUCCESS) {
 		sb4   ora_error_code = 0;
-		text  ora_msg_buf[OCI_ERROR_MAXMSG_SIZE];  /* Use traditional smaller size: non-PL/SQL errors should fit and it keeps the stack smaller */
+		text  ora_msg_buf[PHP_OCI_ERRBUF_LEN];  /* Use traditional smaller size: non-PL/SQL errors should fit and it keeps the stack smaller */
 
 #ifdef HAVE_OCI_INSTANT_CLIENT
 		php_error_docref(NULL, E_WARNING, "OCIEnvNlsCreate() failed. There is something wrong with your system - please check that " PHP_OCI8_LIB_PATH_MSG " includes the directory with Oracle Instant Client libraries");
@@ -3061,7 +2990,7 @@ static OCIEnv *php_oci_create_env(ub2 charsetid)
 		php_error_docref(NULL, E_WARNING, "OCIEnvNlsCreate() failed. There is something wrong with your system - please check that ORACLE_HOME and " PHP_OCI8_LIB_PATH_MSG " are set and point to the right directories");
 #endif
 		if (retenv
-			&& OCIErrorGet(retenv, (ub4)1, NULL, &ora_error_code, ora_msg_buf, (ub4)OCI_ERROR_MAXMSG_SIZE, (ub4)OCI_HTYPE_ENV) == OCI_SUCCESS
+			&& OCIErrorGet(retenv, (ub4)1, NULL, &ora_error_code, ora_msg_buf, (ub4)PHP_OCI_ERRBUF_LEN, (ub4)OCI_HTYPE_ENV) == OCI_SUCCESS
 			&& *ora_msg_buf) {
 			php_error_docref(NULL, E_WARNING, "%s", ora_msg_buf);
 		}
@@ -3079,7 +3008,14 @@ static OCIEnv *php_oci_create_env(ub2 charsetid)
  */
 static int php_oci_old_create_session(php_oci_connection *connection, char *dbname, int dbname_len, char *username, int username_len, char *password, int password_len, char *new_password, int new_password_len, int session_mode)
 {
-	ub4 statement_cache_size = (OCI_G(statement_cache_size) > 0) ? OCI_G(statement_cache_size) : 0;
+	ub4 statement_cache_size = 0;
+
+	if (OCI_G(statement_cache_size) > 0) {
+		if (OCI_G(statement_cache_size) > SB4MAXVAL)
+			statement_cache_size = (ub4) SB4MAXVAL;
+		else
+			statement_cache_size = (ub4) OCI_G(statement_cache_size);
+	}
 
 	/* Create the OCI environment separate for each connection */
 	if (!(connection->env = php_oci_create_env(connection->charset))) {
@@ -3267,7 +3203,14 @@ static int php_oci_create_session(php_oci_connection *connection, php_oci_spool 
 	ub4 purity = -2;				/* Illegal value to initialize */
 #endif
 	time_t timestamp = time(NULL);
-	ub4 statement_cache_size = (OCI_G(statement_cache_size) > 0) ? OCI_G(statement_cache_size) : 0;
+	ub4 statement_cache_size = 0;
+
+	if (OCI_G(statement_cache_size) > 0) {
+		if (OCI_G(statement_cache_size) > SB4MAXVAL)
+			statement_cache_size = (ub4) SB4MAXVAL;
+		else
+			statement_cache_size = (ub4) OCI_G(statement_cache_size);
+	}
 
 	/* Persistent connections have private session pools */
 	if (connection->is_persistent && !connection->private_spool &&
@@ -3524,12 +3467,3 @@ void php_oci_dtrace_check_connection(php_oci_connection *connection, sb4 errcode
 /* }}} */
 
 #endif /* HAVE_OCI8 */
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: noet sw=4 ts=4 fdm=marker
- * vim<600: noet sw=4 ts=4
- */

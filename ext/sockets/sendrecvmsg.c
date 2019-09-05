@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | PHP Version 7                                                        |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1997-2015 The PHP Group                                |
+   | Copyright (c) The PHP Group                                          |
    +----------------------------------------------------------------------+
    | This source file is subject to version 3.01 of the PHP license,      |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -71,7 +71,7 @@ inline ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags)
 #define LONG_CHECK_VALID_INT(l) \
 	do { \
 		if ((l) < INT_MIN && (l) > INT_MAX) { \
-			php_error_docref0(NULL, E_WARNING, "The value %pd does not fit inside " \
+			php_error_docref(NULL, E_WARNING, "The value " ZEND_LONG_FMT " does not fit inside " \
 					"the boundaries of a native integer", (l)); \
 			return; \
 		} \
@@ -219,7 +219,7 @@ PHP_FUNCTION(socket_recvmsg)
 	struct err_s	err = {0};
 
 	//ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags);
-	if (zend_parse_parameters(ZEND_NUM_ARGS(), "ra/|l",
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "ra|l",
 			&zsocket, &zmsg, &flags) == FAILURE) {
 		return;
 	}
@@ -256,7 +256,7 @@ PHP_FUNCTION(socket_recvmsg)
 		msghdr = NULL;
 		allocations_dispose(&allocations);
 
-		zval_dtor(zmsg);
+		zval_ptr_dtor(zmsg);
 		if (!err.has_error) {
 			ZVAL_COPY_VALUE(zmsg, zres);
 		} else {
@@ -292,23 +292,23 @@ PHP_FUNCTION(socket_cmsg_space)
 	LONG_CHECK_VALID_INT(n);
 
 	if (n < 0) {
-		php_error_docref0(NULL, E_WARNING, "The third argument "
+		php_error_docref(NULL, E_WARNING, "The third argument "
 				"cannot be negative");
 		return;
 	}
 
 	entry = get_ancillary_reg_entry(level, type);
 	if (entry == NULL) {
-		php_error_docref0(NULL, E_WARNING, "The pair level %pd/type %pd is "
+		php_error_docref(NULL, E_WARNING, "The pair level " ZEND_LONG_FMT "/type " ZEND_LONG_FMT " is "
 				"not supported by PHP", level, type);
 		return;
 	}
 
-	if (entry->var_el_size > 0 && n > (ZEND_LONG_MAX - (zend_long)entry->size -
-			(zend_long)CMSG_SPACE(0) - 15L) / entry->var_el_size) {
+	if (entry->var_el_size > 0 && n > (zend_long)((ZEND_LONG_MAX - entry->size -
+			CMSG_SPACE(0) - 15L) / entry->var_el_size)) {
 		/* the -15 is to account for any padding CMSG_SPACE may add after the data */
-		php_error_docref0(NULL, E_WARNING, "The value for the "
-				"third argument (%pd) is too large", n);
+		php_error_docref(NULL, E_WARNING, "The value for the "
+				"third argument (" ZEND_LONG_FMT ") is too large", n);
 		return;
 	}
 
@@ -331,7 +331,7 @@ int php_do_setsockopt_ipv6_rfc3542(php_socket *php_sock, int level, int optname,
 	case IPV6_PKTINFO:
 #ifdef PHP_WIN32
 		if (Z_TYPE_P(arg4) == IS_ARRAY) {
-			php_error_docref0(NULL, E_WARNING, "Windows does not "
+			php_error_docref(NULL, E_WARNING, "Windows does not "
 					"support sticky IPV6_PKTINFO");
 			return FAILURE;
 		} else {

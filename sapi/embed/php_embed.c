@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | PHP Version 7                                                        |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1997-2015 The PHP Group                                |
+   | Copyright (c) The PHP Group                                          |
    +----------------------------------------------------------------------+
    | This source file is subject to version 3.01 of the PHP license,      |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -15,7 +15,6 @@
    | Author: Edin Kadribasic <edink@php.net>                              |
    +----------------------------------------------------------------------+
 */
-/* $Id$ */
 
 #include "php_embed.h"
 #include "ext/standard/php_standard.h"
@@ -34,7 +33,7 @@ const char HARDCODED_INI[] =
 	"max_input_time=-1\n\0";
 
 #if defined(PHP_WIN32) && defined(ZTS)
-ZEND_TSRMLS_CACHE_DEFINE();
+ZEND_TSRMLS_CACHE_DEFINE()
 #endif
 
 static char* php_embed_read_cookies(void)
@@ -94,7 +93,7 @@ static void php_embed_send_header(sapi_header_struct *sapi_header, void *server_
 {
 }
 
-static void php_embed_log_message(char *message)
+static void php_embed_log_message(char *message, int syslog_type_int)
 {
 	fprintf (stderr, "%s\n", message);
 }
@@ -160,7 +159,6 @@ EMBED_SAPI_API int php_embed_init(int argc, char **argv)
 {
 	zend_llist global_vars;
 
-#ifdef HAVE_SIGNAL_H
 #if defined(SIGPIPE) && defined(SIG_IGN)
 	signal(SIGPIPE, SIG_IGN); /* ignore SIGPIPE in standalone mode so
 								 that sockets created via fsockopen()
@@ -169,13 +167,15 @@ EMBED_SAPI_API int php_embed_init(int argc, char **argv)
 								 does that for us!  thies@thieso.net
 								 20000419 */
 #endif
-#endif
 
 #ifdef ZTS
-  tsrm_startup(1, 1, 0, NULL);
-  (void)ts_resource(0);
+  php_tsrm_startup();
+# ifdef PHP_WIN32
   ZEND_TSRMLS_CACHE_UPDATE();
+# endif
 #endif
+
+	zend_signal_startup();
 
   sapi_startup(&php_embed_module);
 
@@ -231,12 +231,3 @@ EMBED_SAPI_API void php_embed_shutdown(void)
 		php_embed_module.ini_entries = NULL;
 	}
 }
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: sw=4 ts=4 fdm=marker
- * vim<600: sw=4 ts=4
- */

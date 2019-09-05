@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | Zend Engine                                                          |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1998-2015 Zend Technologies Ltd. (http://www.zend.com) |
+   | Copyright (c) Zend Technologies Ltd. (http://www.zend.com)           |
    +----------------------------------------------------------------------+
    | This source file is subject to version 2.00 of the Zend license,     |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -15,8 +15,6 @@
    | Authors: Christian Seiler <chris_se@gmx.net>                         |
    +----------------------------------------------------------------------+
 */
-
-/* $Id$ */
 
 #ifndef ZEND_FLOAT_H
 #define ZEND_FLOAT_H
@@ -68,7 +66,7 @@ END_EXTERN_C()
     on how to do that?
 
  MS Visual C:
-  - Since MSVC users tipically don't use autoconf or CMake, we will detect
+  - Since MSVC users typically don't use autoconf or CMake, we will detect
     MSVC via compile time define. Floating point precision change isn't
     supported on 64 bit platforms, so it's NOP. See
     http://msdn.microsoft.com/en-us/library/c9676k6h(v=vs.110).aspx
@@ -76,17 +74,7 @@ END_EXTERN_C()
 
 /* MSVC detection (MSVC people usually don't use autoconf) */
 #if defined(_MSC_VER) && !defined(_WIN64)
-# if _MSC_VER >= 1500
-   /* Visual C++ 2008 or higher, supports _controlfp_s */
 #  define HAVE__CONTROLFP_S
-# else
-   /* Visual C++ (up to 2005), supports _controlfp */
-#  define HAVE__CONTROLFP
-# endif /* MSC_VER >= 1500 */
-  /* Tell MSVC optimizer that we access FP environment */
-# if _MSC_VER >= 1500
-#  pragma fenv_access (on)
-# endif
 #endif /* _MSC_VER */
 
 #ifdef HAVE__CONTROLFP_S

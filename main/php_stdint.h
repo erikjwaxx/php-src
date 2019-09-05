@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | PHP Version 7                                                        |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1997-2015 The PHP Group                                |
+   | Copyright (c) The PHP Group                                          |
    +----------------------------------------------------------------------+
    | This source file is subject to version 3.01 of the PHP license,      |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -18,6 +18,28 @@
 
 #ifndef PHP_STDINT_H
 #define PHP_STDINT_H
+
+/* C99 requires these for C++ to get the definitions
+ * of INT64_MAX and other macros used by Zend/zend_long.h
+ * C11 drops this requirement, so these effectively
+ * just backport that piece of behavior.
+ *
+ * These defines are placed here instead of
+ * with the include below, because sys/types
+ * and inttypes may include stdint themselves.
+ * And these definitions MUST come first.
+ */
+#ifdef __cplusplus
+# ifndef __STDC_LIMIT_MACROS
+#  define __STDC_LIMIT_MACROS
+# endif
+# ifndef __STDC_CONSTANT_MACROS
+#  define __STDC_CONSTANT_MACROS
+# endif
+# ifndef __STDC_FORMAT_MACROS
+#  define __STDC_FORMAT_MACROS
+# endif
+#endif
 
 #if defined(_MSC_VER)
 /* Make sure the regular stdint.h wasn't included already and prevent it to be
@@ -196,12 +218,3 @@ typedef unsigned long long uint64_t;
 
 #endif /* !PHP_WIN32 */
 #endif /* PHP_STDINT_H */
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: sw=4 ts=4 fdm=marker
- * vim<600: sw=4 ts=4
- */

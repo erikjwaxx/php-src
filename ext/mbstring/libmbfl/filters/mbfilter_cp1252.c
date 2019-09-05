@@ -45,7 +45,9 @@ const mbfl_encoding mbfl_encoding_cp1252 = {
 	"Windows-1252",
 	(const char *(*)[])&mbfl_encoding_cp1252_aliases,
 	NULL,
-	MBFL_ENCTYPE_SBCS
+	MBFL_ENCTYPE_SBCS,
+	&vtbl_cp1252_wchar,
+	&vtbl_wchar_cp1252
 };
 
 const struct mbfl_identify_vtbl vtbl_identify_cp1252 = {
@@ -104,9 +106,7 @@ int mbfl_filt_conv_wchar_cp1252(int c, mbfl_convert_filter *filter)
 	if (s >= 0) {
 		CK((*filter->output_function)(s, filter->data));
 	} else {
-		if (filter->illegal_mode != MBFL_OUTPUTFILTER_ILLEGAL_MODE_NONE) {
-			CK(mbfl_filt_conv_illegal_output(c, filter));
-		}
+		CK(mbfl_filt_conv_illegal_output(c, filter));
 	}
 	return c;
 }
@@ -143,5 +143,3 @@ static int mbfl_filt_ident_cp1252(int c, mbfl_identify_filter *filter)
 		filter->flag = 1; /* not it */
 	return c;
 }
-
-

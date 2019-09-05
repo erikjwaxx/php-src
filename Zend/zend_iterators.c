@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | Zend Engine                                                          |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1998-2015 Zend Technologies Ltd. (http://www.zend.com) |
+   | Copyright (c) Zend Technologies Ltd. (http://www.zend.com)           |
    +----------------------------------------------------------------------+
    | This source file is subject to version 2.00 of the Zend license,     |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -17,8 +17,6 @@
    +----------------------------------------------------------------------+
 */
 
-/* $Id$ */
-
 #include "zend.h"
 #include "zend_API.h"
 
@@ -26,8 +24,9 @@ static zend_class_entry zend_iterator_class_entry;
 
 static void iter_wrapper_free(zend_object *object);
 static void iter_wrapper_dtor(zend_object *object);
+static HashTable *iter_wrapper_get_gc(zend_object *object, zval **table, int *n);
 
-static zend_object_handlers iterator_object_handlers = {
+static const zend_object_handlers iterator_object_handlers = {
 	0,
 	iter_wrapper_free,
 	iter_wrapper_dtor,
@@ -37,15 +36,12 @@ static zend_object_handlers iterator_object_handlers = {
 	NULL, /* read dim */
 	NULL, /* write dim */
 	NULL,
-	NULL, /* get */
-	NULL, /* set */
 	NULL, /* has prop */
 	NULL, /* unset prop */
 	NULL, /* has dim */
 	NULL, /* unset dim */
 	NULL, /* props get */
 	NULL, /* method get */
-	NULL, /* call */
 	NULL, /* get ctor */
 	NULL, /* get class name */
 	NULL, /* compare */
@@ -53,7 +49,7 @@ static zend_object_handlers iterator_object_handlers = {
 	NULL, /* count */
 	NULL, /* get_debug_info */
 	NULL, /* get_closure */
-	NULL, /* get_gc */
+	iter_wrapper_get_gc,
 	NULL, /* do_operation */
 	NULL  /* compare */
 };
@@ -73,6 +69,13 @@ static void iter_wrapper_dtor(zend_object *object)
 {
 }
 
+static HashTable *iter_wrapper_get_gc(zend_object *object, zval **table, int *n) {
+	/* TODO: We need a get_gc iterator handler */
+	*table = NULL;
+	*n = 0;
+	return NULL;
+}
+
 ZEND_API void zend_iterator_init(zend_object_iterator *iter)
 {
 	zend_object_std_init(&iter->std, &zend_iterator_class_entry);
@@ -81,7 +84,7 @@ ZEND_API void zend_iterator_init(zend_object_iterator *iter)
 
 ZEND_API void zend_iterator_dtor(zend_object_iterator *iter)
 {
-	if (--GC_REFCOUNT(iter) > 0) {
+	if (GC_DELREF(&iter->std) > 0) {
 		return;
 	}
 
@@ -90,17 +93,9 @@ ZEND_API void zend_iterator_dtor(zend_object_iterator *iter)
 
 ZEND_API zend_object_iterator* zend_iterator_unwrap(zval *array_ptr)
 {
-	if (Z_TYPE_P(array_ptr) &&
-	    Z_OBJ_HT_P(array_ptr) == &iterator_object_handlers) {
+	ZEND_ASSERT(Z_TYPE_P(array_ptr) == IS_OBJECT);
+	if (Z_OBJ_HT_P(array_ptr) == &iterator_object_handlers) {
 		return (zend_object_iterator *)Z_OBJ_P(array_ptr);
 	}
 	return NULL;
 }
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * indent-tabs-mode: t
- * End:
- */

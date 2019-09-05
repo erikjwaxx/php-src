@@ -2,7 +2,7 @@
   +----------------------------------------------------------------------+
   | PHP Version 7                                                        |
   +----------------------------------------------------------------------+
-  | Copyright (c) 1997-2015 The PHP Group                                |
+  | Copyright (c) The PHP Group                                          |
   +----------------------------------------------------------------------+
   | This source file is subject to version 3.01 of the PHP license,      |
   | that is bundled with this package in the file LICENSE, and is        |
@@ -15,8 +15,6 @@
   | Author: Wez Furlong <wez@php.net>                                    |
   +----------------------------------------------------------------------+
 */
-
-/* $Id$ */
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -31,33 +29,25 @@
 #include "php_pdo_sqlite_int.h"
 #include "zend_exceptions.h"
 
-#define PHP_PDO_SQLITE_MODULE_VERSION	"1.0.1"
-
 /* {{{ pdo_sqlite_functions[] */
-const zend_function_entry pdo_sqlite_functions[] = {
+static const zend_function_entry pdo_sqlite_functions[] = {
 	PHP_FE_END
 };
 /* }}} */
 
 /* {{{ pdo_sqlite_deps
  */
-#if ZEND_MODULE_API_NO >= 20050922
 static const zend_module_dep pdo_sqlite_deps[] = {
 	ZEND_MOD_REQUIRED("pdo")
 	ZEND_MOD_END
 };
-#endif
 /* }}} */
 
 /* {{{ pdo_sqlite_module_entry
  */
 zend_module_entry pdo_sqlite_module_entry = {
-#if ZEND_MODULE_API_NO >= 20050922
 	STANDARD_MODULE_HEADER_EX, NULL,
 	pdo_sqlite_deps,
-#else
-	STANDARD_MODULE_HEADER,
-#endif
 	"pdo_sqlite",
 	pdo_sqlite_functions,
 	PHP_MINIT(pdo_sqlite),
@@ -65,7 +55,7 @@ zend_module_entry pdo_sqlite_module_entry = {
 	NULL,
 	NULL,
 	PHP_MINFO(pdo_sqlite),
-	PHP_PDO_SQLITE_MODULE_VERSION,
+	PHP_PDO_SQLITE_VERSION,
 	STANDARD_MODULE_PROPERTIES
 };
 /* }}} */
@@ -77,6 +67,17 @@ ZEND_GET_MODULE(pdo_sqlite)
 /* {{{ PHP_MINIT_FUNCTION */
 PHP_MINIT_FUNCTION(pdo_sqlite)
 {
+#ifdef SQLITE_DETERMINISTIC
+	REGISTER_PDO_CLASS_CONST_LONG("SQLITE_DETERMINISTIC", (zend_long)SQLITE_DETERMINISTIC);
+#endif
+
+	REGISTER_PDO_CLASS_CONST_LONG("SQLITE_ATTR_OPEN_FLAGS", (zend_long)PDO_SQLITE_ATTR_OPEN_FLAGS);
+	REGISTER_PDO_CLASS_CONST_LONG("SQLITE_OPEN_READONLY", (zend_long)SQLITE_OPEN_READONLY);
+	REGISTER_PDO_CLASS_CONST_LONG("SQLITE_OPEN_READWRITE", (zend_long)SQLITE_OPEN_READWRITE);
+	REGISTER_PDO_CLASS_CONST_LONG("SQLITE_OPEN_CREATE", (zend_long)SQLITE_OPEN_CREATE);
+	REGISTER_PDO_CLASS_CONST_LONG("SQLITE_ATTR_READONLY_STATEMENT", (zend_long)PDO_SQLITE_ATTR_READONLY_STATEMENT);
+	REGISTER_PDO_CLASS_CONST_LONG("SQLITE_ATTR_EXTENDED_RESULT_CODES", (zend_long)PDO_SQLITE_ATTR_EXTENDED_RESULT_CODES);
+
 	return php_pdo_register_driver(&pdo_sqlite_driver);
 }
 /* }}} */
@@ -99,12 +100,3 @@ PHP_MINFO_FUNCTION(pdo_sqlite)
 	php_info_print_table_end();
 }
 /* }}} */
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: noet sw=4 ts=4 fdm=marker
- * vim<600: noet sw=4 ts=4
- */

@@ -2,7 +2,7 @@
   +----------------------------------------------------------------------+
   | PHP Version 7                                                        |
   +----------------------------------------------------------------------+
-  | Copyright (c) 1997-2015 The PHP Group                                |
+  | Copyright (c) The PHP Group                                          |
   +----------------------------------------------------------------------+
   | This source file is subject to version 3.01 of the PHP license,      |
   | that is bundled with this package in the file LICENSE, and is        |
@@ -16,8 +16,6 @@
   |          Andrey Hristov <andrey@php.net>                             |
   |          Ulf Wendel <uw@php.net>                                     |
   +----------------------------------------------------------------------+
-
-  $Id$
 */
 
 #ifdef HAVE_CONFIG_H
@@ -41,24 +39,24 @@
 static void mysqli_tx_cor_options_to_string(const MYSQL * const conn, smart_str * str, const uint32_t mode)
 {
 	if (mode & TRANS_COR_AND_CHAIN && !(mode & TRANS_COR_AND_NO_CHAIN)) {
-		if (str->s && str->s->len) {
+		if (str->s && ZSTR_LEN(str->s)) {
 			smart_str_appendl(str, " ", sizeof(" ") - 1);
 		}
 		smart_str_appendl(str, "AND CHAIN", sizeof("AND CHAIN") - 1);
 	} else if (mode & TRANS_COR_AND_NO_CHAIN && !(mode & TRANS_COR_AND_CHAIN)) {
-		if (str->s && str->s->len) {
+		if (str->s && ZSTR_LEN(str->s)) {
 			smart_str_appendl(str, " ", sizeof(" ") - 1);
 		}
 		smart_str_appendl(str, "AND NO CHAIN", sizeof("AND NO CHAIN") - 1);
 	}
 
 	if (mode & TRANS_COR_RELEASE && !(mode & TRANS_COR_NO_RELEASE)) {
-		if (str->s && str->s->len) {
+		if (str->s && ZSTR_LEN(str->s)) {
 			smart_str_appendl(str, " ", sizeof(" ") - 1);
 		}
 		smart_str_appendl(str, "RELEASE", sizeof("RELEASE") - 1);
 	} else if (mode & TRANS_COR_NO_RELEASE && !(mode & TRANS_COR_RELEASE)) {
-		if (str->s && str->s->len) {
+		if (str->s && ZSTR_LEN(str->s)) {
 			smart_str_appendl(str, " ", sizeof(" ") - 1);
 		}
 		smart_str_appendl(str, "NO RELEASE", sizeof("NO RELEASE") - 1);
@@ -122,7 +120,7 @@ static int mysqli_commit_or_rollback_libmysql(MYSQL * conn, zend_bool commit, co
 		size_t query_len;
 
 		query_len = spprintf(&query, 0,
-				(commit? "COMMIT%s %s":"ROLLBACK%s %s"), name_esc? name_esc:"", tmp_str.s? tmp_str.s->val:"");
+				(commit? "COMMIT%s %s":"ROLLBACK%s %s"), name_esc? name_esc:"", tmp_str.s? ZSTR_VAL(tmp_str.s):"");
 		smart_str_free(&tmp_str);
 		if (name_esc) {
 			efree(name_esc);
@@ -315,7 +313,7 @@ end:
 #endif
 /* }}} */
 
-/* {{{ proto bool mysqli_stmt_bind_param(object stmt, string types, mixed variable [,mixed,....]) U
+/* {{{ proto bool mysqli_stmt_bind_param(object stmt, string types, mixed variable [,mixed ...])
    Bind variables to a prepared statement as parameters */
 PHP_FUNCTION(mysqli_stmt_bind_param)
 {
@@ -354,7 +352,7 @@ PHP_FUNCTION(mysqli_stmt_bind_param)
 		RETURN_FALSE;
 	}
 
-	if (types_len != argc - start) {
+	if (types_len != (size_t)(argc - start)) {
 		/* number of bind variables doesn't match number of elements in type definition string */
 		php_error_docref(NULL, E_WARNING, "Number of elements in type definition string doesn't match number of bind variables");
 		RETURN_FALSE;
@@ -387,11 +385,11 @@ PHP_FUNCTION(mysqli_stmt_bind_param)
    do_alloca, free_alloca
 */
 static int
-mysqli_stmt_bind_result_do_bind(MY_STMT *stmt, zval *args, unsigned int argc, unsigned int start)
+mysqli_stmt_bind_result_do_bind(MY_STMT *stmt, zval *args, unsigned int argc)
 {
 	MYSQL_BIND	*bind;
 	int			i, ofs;
-	int			var_cnt = argc - start;
+	int			var_cnt = argc;
 	zend_long		col_type;
 	zend_ulong		rc;
 
@@ -409,8 +407,8 @@ mysqli_stmt_bind_result_do_bind(MY_STMT *stmt, zval *args, unsigned int argc, un
 		memset(p, 0, size);
 	}
 
-	for (i=start; i < var_cnt + start ; i++) {
-		ofs = i - start;
+	for (i = 0; i < var_cnt; i++) {
+		ofs = i;
 		col_type = (stmt->stmt->fields) ? stmt->stmt->fields[ofs].type : MYSQL_TYPE_STRING;
 
 		switch (col_type) {
@@ -544,7 +542,7 @@ mysqli_stmt_bind_result_do_bind(MY_STMT *stmt, zval *args, unsigned int argc, un
 	MYSQLI_REPORT_STMT_ERROR(stmt->stmt);
 
 	if (rc) {
-		/* dont close the statement or subsequent usage (for example ->execute()) will lead to crash */
+		/* don't close the statement or subsequent usage (for example ->execute()) will lead to crash */
 		for (i=0; i < var_cnt ; i++) {
 			if (stmt->result.buf[i].val) {
 				efree(stmt->result.buf[i].val);
@@ -555,9 +553,8 @@ mysqli_stmt_bind_result_do_bind(MY_STMT *stmt, zval *args, unsigned int argc, un
 	} else {
 		stmt->result.var_cnt = var_cnt;
 		stmt->result.vars = safe_emalloc((var_cnt), sizeof(zval), 0);
-		for (i = start; i < var_cnt+start; i++) {
-			ofs = i-start;
-			ZVAL_COPY(&stmt->result.vars[ofs], &args[i]);
+		for (i = 0; i < var_cnt; i++) {
+			ZVAL_COPY(&stmt->result.vars[i], &args[i]);
 		}
 	}
 	efree(bind);
@@ -566,13 +563,13 @@ mysqli_stmt_bind_result_do_bind(MY_STMT *stmt, zval *args, unsigned int argc, un
 }
 #else
 static int
-mysqli_stmt_bind_result_do_bind(MY_STMT *stmt, zval *args, unsigned int argc, unsigned int start)
+mysqli_stmt_bind_result_do_bind(MY_STMT *stmt, zval *args, unsigned int argc)
 {
 	unsigned int i;
 	MYSQLND_RESULT_BIND *params = mysqlnd_stmt_alloc_result_bind(stmt->stmt);
 	if (params) {
-		for (i = 0; i < (argc - start); i++) {
-			ZVAL_COPY_VALUE(&params[i].zv, &args[i + start]);
+		for (i = 0; i < argc; i++) {
+			ZVAL_COPY_VALUE(&params[i].zv, &args[i]);
 		}
 		return mysqlnd_stmt_bind_result(stmt->stmt, params);
 	}
@@ -581,47 +578,28 @@ mysqli_stmt_bind_result_do_bind(MY_STMT *stmt, zval *args, unsigned int argc, un
 #endif
 /* }}} */
 
-/* {{{ proto bool mysqli_stmt_bind_result(object stmt, mixed var, [,mixed, ...]) U
+/* {{{ proto bool mysqli_stmt_bind_result(object stmt, mixed var [,mixed ...])
    Bind variables to a prepared statement for result storage */
 PHP_FUNCTION(mysqli_stmt_bind_result)
 {
 	zval		*args;
-	int			argc = ZEND_NUM_ARGS();
-	int			start = 1;
+	int			argc;
 	zend_ulong		rc;
 	MY_STMT		*stmt;
 	zval		*mysql_stmt;
 
-	if (getThis()) {
-		start = 0;
-	}
-
-	if (zend_parse_method_parameters((getThis()) ? 0:1, getThis(), "O", &mysql_stmt, mysqli_stmt_class_entry) == FAILURE) {
+	if (zend_parse_method_parameters(ZEND_NUM_ARGS(), getThis(), "O+", &mysql_stmt, mysqli_stmt_class_entry, &args, &argc) == FAILURE) {
 		return;
 	}
 
 	MYSQLI_FETCH_RESOURCE_STMT(stmt, mysql_stmt, MYSQLI_STATUS_VALID);
 
-	if (argc < (getThis() ? 1 : 2)) {
-		WRONG_PARAM_COUNT;
-	}
-
-	if ((argc - start) != mysql_stmt_field_count(stmt->stmt)) {
+	if ((uint32_t)argc != mysql_stmt_field_count(stmt->stmt)) {
 		php_error_docref(NULL, E_WARNING, "Number of bind variables doesn't match number of fields in prepared statement");
 		RETURN_FALSE;
 	}
 
-	args = safe_emalloc(argc, sizeof(zval), 0);
-
-	if (zend_get_parameters_array_ex(argc, args) == FAILURE) {
-		efree(args);
-		WRONG_PARAM_COUNT;
-	}
-
-	rc = mysqli_stmt_bind_result_do_bind(stmt, args, argc, start);
-
-	efree(args);
-
+	rc = mysqli_stmt_bind_result_do_bind(stmt, args, argc);
 	RETURN_BOOL(!rc);
 }
 /* }}} */
@@ -639,7 +617,7 @@ PHP_FUNCTION(mysqli_change_user)
 	const		CHARSET_INFO * old_charset;
 #endif
 
-	if (zend_parse_method_parameters(ZEND_NUM_ARGS(), getThis(), "Osss", &mysql_link, mysqli_link_class_entry, &user, &user_len, &password, &password_len, &dbname, &dbname_len) == FAILURE) {
+	if (zend_parse_method_parameters(ZEND_NUM_ARGS(), getThis(), "Osss!", &mysql_link, mysqli_link_class_entry, &user, &user_len, &password, &password_len, &dbname, &dbname_len) == FAILURE) {
 		return;
 	}
 	MYSQLI_FETCH_RESOURCE_CONN(mysql, mysql_link, MYSQLI_STATUS_VALID);
@@ -659,7 +637,7 @@ PHP_FUNCTION(mysqli_change_user)
 		RETURN_FALSE;
 	}
 #if !defined(MYSQLI_USE_MYSQLND) && defined(HAVE_MYSQLI_SET_CHARSET)
-	if (mysql_get_server_version(mysql->mysql) < 501023L) {
+	if (mysql_get_server_version(mysql->mysql) < 50123L) {
 		/*
 		  Request the current charset, or it will be reset to the system one.
 		  5.0 doesn't support it. Support added in 5.1.23 by fixing the following bug :
@@ -810,7 +788,7 @@ PHP_FUNCTION(mysqli_data_seek)
 }
 /* }}} */
 
-/* {{{ proto void mysqli_debug(string debug) U
+/* {{{ proto void mysqli_debug(string debug)
 */
 PHP_FUNCTION(mysqli_debug)
 {
@@ -838,7 +816,7 @@ PHP_FUNCTION(mysqli_dump_debug_info)
 	}
 	MYSQLI_FETCH_RESOURCE_CONN(mysql, mysql_link, MYSQLI_STATUS_VALID);
 
-	RETURN_BOOL(!mysql_dump_debug_info(mysql->mysql))
+	RETURN_BOOL(!mysql_dump_debug_info(mysql->mysql));
 }
 /* }}} */
 
@@ -900,9 +878,11 @@ PHP_FUNCTION(mysqli_stmt_execute)
 			}
 			for (j = i + 1; j < stmt->param.var_cnt; j++) {
 				/* Oops, someone binding the same variable - clone */
-				if (Z_TYPE(stmt->param.vars[j]) == Z_TYPE(stmt->param.vars[i]) &&
+				if (Z_ISREF(stmt->param.vars[j]) &&
 					   	Z_REFVAL(stmt->param.vars[j]) == Z_REFVAL(stmt->param.vars[i])) {
-					SEPARATE_ZVAL(&stmt->param.vars[j]);
+					/*SEPARATE_ZVAL(&stmt->param.vars[j]);*/
+					Z_DELREF_P(&stmt->param.vars[j]);
+					ZVAL_COPY(&stmt->param.vars[j], Z_REFVAL(stmt->param.vars[j]));
 					break;
 				}
 			}
@@ -919,7 +899,10 @@ PHP_FUNCTION(mysqli_stmt_execute)
 			if (!(stmt->param.is_null[i] = (Z_ISNULL_P(param)))) {
 				switch (stmt->stmt->params[i].buffer_type) {
 					case MYSQL_TYPE_VAR_STRING:
-						convert_to_string_ex(param);
+						if (!try_convert_to_string(param)) {
+							return;
+						}
+
 						stmt->stmt->params[i].buffer = Z_STRVAL_P(param);
 						stmt->stmt->params[i].buffer_length = Z_STRLEN_P(param);
 						break;
@@ -987,17 +970,11 @@ void mysqli_stmt_fetch_libmysql(INTERNAL_FUNCTION_PARAMETERS)
 			zval *result;
 			/* it must be a reference, isn't it? */
 			if (Z_ISREF(stmt->result.vars[i])) {
-				result = Z_REFVAL(stmt->result.vars[i]);
-			} else {
 				result = &stmt->result.vars[i];
+			} else {
+				continue; // but be safe ...
 			}
-			/*
-			  QQ: Isn't it quite better to call zval_dtor(). What if the user has
-			  assigned a resource, or an array to the bound variable? We are going
-			  to leak probably. zval_dtor() will handle also Unicode/Non-unicode mode.
-			*/
 			/* Even if the string is of length zero there is one byte alloced so efree() in all cases */
-			zval_ptr_dtor(result);
 			if (!stmt->result.is_null[i]) {
 				switch (stmt->result.buf[i].type) {
 					case IS_LONG:
@@ -1018,16 +995,16 @@ void mysqli_stmt_fetch_libmysql(INTERNAL_FUNCTION_PARAMETERS)
 								} while (--j > 0);
 								tmp[10]= '\0';
 								/* unsigned int > INT_MAX is 10 digits - ALWAYS */
-								ZVAL_STRINGL(result, tmp, 10);
+								ZEND_TRY_ASSIGN_REF_STRINGL(result, tmp, 10);
 								efree(tmp);
 								break;
 							}
 #endif
 						}
 						if (stmt->stmt->fields[i].flags & UNSIGNED_FLAG) {
-							ZVAL_LONG(result, *(unsigned int *)stmt->result.buf[i].val);
+							ZEND_TRY_ASSIGN_REF_LONG(result, *(unsigned int *)stmt->result.buf[i].val);
 						} else {
-							ZVAL_LONG(result, *(int *)stmt->result.buf[i].val);
+							ZEND_TRY_ASSIGN_REF_LONG(result, *(int *)stmt->result.buf[i].val);
 						}
 						break;
 					case IS_DOUBLE:
@@ -1044,7 +1021,7 @@ void mysqli_stmt_fetch_libmysql(INTERNAL_FUNCTION_PARAMETERS)
 							dval = *((double *)stmt->result.buf[i].val);
 						}
 
-						ZVAL_DOUBLE(result, dval);
+						ZEND_TRY_ASSIGN_REF_DOUBLE(result, dval);
 						break;
 					}
 					case IS_STRING:
@@ -1085,20 +1062,20 @@ void mysqli_stmt_fetch_libmysql(INTERNAL_FUNCTION_PARAMETERS)
 								 * use MYSQLI_LL_SPEC.
 								 */
 								snprintf(tmp, sizeof(tmp), (stmt->stmt->fields[i].flags & UNSIGNED_FLAG)? MYSQLI_LLU_SPEC : MYSQLI_LL_SPEC, llval);
-								ZVAL_STRING(result, tmp);
+								ZEND_TRY_ASSIGN_REF_STRING(result, tmp);
 							} else {
-								ZVAL_LONG(result, llval);
+								ZEND_TRY_ASSIGN_REF_LONG(result, llval);
 							}
 						} else {
 #if defined(MYSQL_DATA_TRUNCATED) && MYSQL_VERSION_ID > 50002
 							if (ret == MYSQL_DATA_TRUNCATED && *(stmt->stmt->bind[i].error) != 0) {
 								/* result was truncated */
-								ZVAL_STRINGL(result, stmt->result.buf[i].val, stmt->stmt->bind[i].buffer_length);
+								ZEND_TRY_ASSIGN_REF_STRINGL(result, stmt->result.buf[i].val, stmt->stmt->bind[i].buffer_length);
 							} else {
 #else
 							{
 #endif
-								ZVAL_STRINGL(result, stmt->result.buf[i].val, stmt->result.buf[i].output_len);
+								ZEND_TRY_ASSIGN_REF_STRINGL(result, stmt->result.buf[i].val, stmt->result.buf[i].output_len);
 							}
 						}
 						break;
@@ -1106,7 +1083,7 @@ void mysqli_stmt_fetch_libmysql(INTERNAL_FUNCTION_PARAMETERS)
 						break;
 				}
 			} else {
-				ZVAL_NULL(result);
+				ZEND_TRY_ASSIGN_REF_NULL(result);
 			}
 		}
 	} else {
@@ -1157,7 +1134,7 @@ void mysqli_stmt_fetch_mysqlnd(INTERNAL_FUNCTION_PARAMETERS)
 #endif
 /* }}} */
 
-/* {{{ proto mixed mysqli_stmt_fetch(object stmt) U
+/* {{{ proto mixed mysqli_stmt_fetch(object stmt)
    Fetch results from a prepared statement into the bound variables */
 PHP_FUNCTION(mysqli_stmt_fetch)
 {
@@ -1199,7 +1176,7 @@ static void php_add_field_properties(zval *value, const MYSQL_FIELD *field)
 }
 /* }}} */
 
-/* {{{ proto mixed mysqli_fetch_field (object result)
+/* {{{ proto mixed mysqli_fetch_field(object result)
    Get column information from a result and return as an object */
 PHP_FUNCTION(mysqli_fetch_field)
 {
@@ -1222,7 +1199,7 @@ PHP_FUNCTION(mysqli_fetch_field)
 }
 /* }}} */
 
-/* {{{ proto mixed mysqli_fetch_fields (object result)
+/* {{{ proto mixed mysqli_fetch_fields(object result)
    Return array of objects containing field meta-data */
 PHP_FUNCTION(mysqli_fetch_fields)
 {
@@ -1230,7 +1207,7 @@ PHP_FUNCTION(mysqli_fetch_fields)
 	zval		*mysql_result;
 	zval		obj;
 
-	unsigned int i;
+	unsigned int i, num_fields;
 
 	if (zend_parse_method_parameters(ZEND_NUM_ARGS(), getThis(), "O", &mysql_result, mysqli_result_class_entry) == FAILURE) {
 		return;
@@ -1239,8 +1216,9 @@ PHP_FUNCTION(mysqli_fetch_fields)
 	MYSQLI_FETCH_RESOURCE(result, MYSQL_RES *, mysql_result, "mysqli_result", MYSQLI_STATUS_VALID);
 
 	array_init(return_value);
+	num_fields = mysql_num_fields(result);
 
-	for (i = 0; i < mysql_num_fields(result); i++) {
+	for (i = 0; i < num_fields; i++) {
 		const MYSQL_FIELD *field = mysql_fetch_field_direct(result, i);
 
 		object_init(&obj);
@@ -1251,7 +1229,7 @@ PHP_FUNCTION(mysqli_fetch_fields)
 }
 /* }}} */
 
-/* {{{ proto mixed mysqli_fetch_field_direct (object result, int offset)
+/* {{{ proto mixed mysqli_fetch_field_direct(object result, int offset)
    Fetch meta-data for a single field */
 PHP_FUNCTION(mysqli_fetch_field_direct)
 {
@@ -1280,14 +1258,18 @@ PHP_FUNCTION(mysqli_fetch_field_direct)
 }
 /* }}} */
 
-/* {{{ proto mixed mysqli_fetch_lengths (object result)
+/* {{{ proto mixed mysqli_fetch_lengths(object result)
    Get the length of each output in a result */
 PHP_FUNCTION(mysqli_fetch_lengths)
 {
 	MYSQL_RES		*result;
 	zval			*mysql_result;
-	unsigned int	i;
-	zend_ulong	*ret;
+	unsigned int	i, num_fields;
+#if defined(MYSQLI_USE_MYSQLND)
+	const size_t	*ret;
+#else
+	const zend_ulong *ret;
+#endif
 
 	if (zend_parse_method_parameters(ZEND_NUM_ARGS(), getThis(), "O", &mysql_result, mysqli_result_class_entry) == FAILURE) {
 		return;
@@ -1300,14 +1282,15 @@ PHP_FUNCTION(mysqli_fetch_lengths)
 	}
 
 	array_init(return_value);
+	num_fields = mysql_num_fields(result);
 
-	for (i = 0; i < mysql_num_fields(result); i++) {
+	for (i = 0; i < num_fields; i++) {
 		add_index_long(return_value, i, ret[i]);
 	}
 }
 /* }}} */
 
-/* {{{ proto array mysqli_fetch_row (object result)
+/* {{{ proto array mysqli_fetch_row(object result)
    Get a result row as an enumerated array */
 PHP_FUNCTION(mysqli_fetch_row)
 {
@@ -1346,7 +1329,7 @@ PHP_FUNCTION(mysqli_field_seek)
 	}
 	MYSQLI_FETCH_RESOURCE(result, MYSQL_RES *, mysql_result, "mysqli_result", MYSQLI_STATUS_VALID);
 
-	if (fieldnr < 0 || fieldnr >= mysql_num_fields(result)) {
+	if (fieldnr < 0 || (uint32_t)fieldnr >= mysql_num_fields(result)) {
 		php_error_docref(NULL, E_WARNING, "Invalid field offset");
 		RETURN_FALSE;
 	}
@@ -1408,7 +1391,7 @@ PHP_FUNCTION(mysqli_get_client_version)
 }
 /* }}} */
 
-/* {{{ proto string mysqli_get_host_info (object link)
+/* {{{ proto string mysqli_get_host_info(object link)
    Get MySQL host info */
 PHP_FUNCTION(mysqli_get_host_info)
 {
@@ -1499,19 +1482,12 @@ PHP_FUNCTION(mysqli_info)
 /* }}} */
 
 /* {{{ php_mysqli_init() */
-void php_mysqli_init(INTERNAL_FUNCTION_PARAMETERS)
+void php_mysqli_init(INTERNAL_FUNCTION_PARAMETERS, zend_bool is_method)
 {
 	MYSQLI_RESOURCE *mysqli_resource;
 	MY_MYSQL *mysql;
 
-// TODO: We can't properly check if this was to mysql_init() in a class method
-//       or a call to mysqli->init().
-//       To solve the problem, we added instanceof check for the class of $this
-//       ???
-	if (getThis() &&
-	    instanceof_function(Z_OBJCE_P(getThis()), mysqli_link_class_entry) &&
-	    (Z_MYSQLI_P(getThis()))->ptr) {
-//???	if (getThis() && (Z_MYSQLI_P(getThis()))->ptr) {
+	if (is_method && (Z_MYSQLI_P(getThis()))->ptr) {
 		return;
 	}
 
@@ -1535,7 +1511,7 @@ void php_mysqli_init(INTERNAL_FUNCTION_PARAMETERS)
 	mysqli_resource->ptr = (void *)mysql;
 	mysqli_resource->status = MYSQLI_STATUS_INITIALIZED;
 
-	if (!getThis() || !instanceof_function(Z_OBJCE_P(getThis()), mysqli_link_class_entry)) {
+	if (!is_method) {
 		MYSQLI_RETURN_RESOURCE(mysqli_resource, mysqli_link_class_entry);
 	} else {
 		(Z_MYSQLI_P(getThis()))->ptr = mysqli_resource;
@@ -1547,7 +1523,15 @@ void php_mysqli_init(INTERNAL_FUNCTION_PARAMETERS)
    Initialize mysqli and return a resource for use with mysql_real_connect */
 PHP_FUNCTION(mysqli_init)
 {
-	php_mysqli_init(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+	php_mysqli_init(INTERNAL_FUNCTION_PARAM_PASSTHRU, FALSE);
+}
+/* }}} */
+
+/* {{{ proto resource mysqli::init(void)
+   Initialize mysqli and return a resource for use with mysql_real_connect */
+PHP_FUNCTION(mysqli_init_method)
+{
+	php_mysqli_init(INTERNAL_FUNCTION_PARAM_PASSTHRU, TRUE);
 }
 /* }}} */
 
@@ -1621,18 +1605,12 @@ PHP_FUNCTION(mysqli_next_result) {
 	}
 	MYSQLI_FETCH_RESOURCE_CONN(mysql, mysql_link, MYSQLI_STATUS_VALID);
 
-	if (!mysql_more_results(mysql->mysql)) {
-		php_error_docref(NULL, E_STRICT, "There is no next result set. "
-						"Please, call mysqli_more_results()/mysqli::more_results() to check "
-						"whether to call this function/method");
-	}
-
 	RETURN_BOOL(!mysql_next_result(mysql->mysql));
 }
 /* }}} */
 
 #if defined(HAVE_STMT_NEXT_RESULT) && defined(MYSQLI_USE_MYSQLND)
-/* {{{ proto bool mysqli_stmt_next_result(object link)
+/* {{{ proto bool mysqli_stmt_more_results(object link)
    check if there any more query results from a multi query */
 PHP_FUNCTION(mysqli_stmt_more_results)
 {
@@ -1658,12 +1636,6 @@ PHP_FUNCTION(mysqli_stmt_next_result) {
 		return;
 	}
 	MYSQLI_FETCH_RESOURCE_STMT(stmt, mysql_stmt, MYSQLI_STATUS_VALID);
-
-	if (!mysqlnd_stmt_more_results(stmt->stmt)) {
-		php_error_docref(NULL, E_STRICT, "There is no next result set. "
-						"Please, call mysqli_stmt_more_results()/mysqli_stmt::more_results() to check "
-						"whether to call this function/method");
-	}
 
 	RETURN_BOOL(!mysql_stmt_next_result(stmt->stmt));
 }
@@ -1712,10 +1684,6 @@ static int mysqli_options_get_option_zval_type(int option)
 {
 	switch (option) {
 #ifdef MYSQLI_USE_MYSQLND
-#if PHP_MAJOR_VERSION == 6
-		/* PHP-7 doesn't supprt unicode yet ??? */
-		case MYSQLND_OPT_NUMERIC_AND_DATETIME_AS_UNICODE:
-#endif
 		case MYSQLND_OPT_NET_CMD_BUFFER_SIZE:
 		case MYSQLND_OPT_NET_READ_BUFFER_SIZE:
 #ifdef MYSQLND_STRING_TO_INT_CONVERSION
@@ -1731,14 +1699,12 @@ static int mysqli_options_get_option_zval_type(int option)
 #ifdef MYSQL_OPT_PROTOCOL
                 case MYSQL_OPT_PROTOCOL:
 #endif /* MySQL 4.1.0 */
-#ifdef MYSQL_OPT_READ_TIMEOUT
 		case MYSQL_OPT_READ_TIMEOUT:
 		case MYSQL_OPT_WRITE_TIMEOUT:
 		case MYSQL_OPT_GUESS_CONNECTION:
 		case MYSQL_OPT_USE_EMBEDDED_CONNECTION:
 		case MYSQL_OPT_USE_REMOTE_CONNECTION:
 		case MYSQL_SECURE_AUTH:
-#endif /* MySQL 4.1.1 */
 #ifdef MYSQL_OPT_RECONNECT
 		case MYSQL_OPT_RECONNECT:
 #endif /* MySQL 5.0.13 */
@@ -1795,20 +1761,20 @@ PHP_FUNCTION(mysqli_options)
 	}
 	MYSQLI_FETCH_RESOURCE_CONN(mysql, mysql_link, MYSQLI_STATUS_INITIALIZED);
 
-#if PHP_API_VERSION < 20100412
-	if ((PG(open_basedir) && PG(open_basedir)[0] != '\0') || PG(safe_mode)) {
-#else
+#if !defined(MYSQLI_USE_MYSQLND)
 	if (PG(open_basedir) && PG(open_basedir)[0] != '\0') {
-#endif
 		if(mysql_option == MYSQL_OPT_LOCAL_INFILE) {
 			RETURN_FALSE;
 		}
 	}
+#endif
 	expected_type = mysqli_options_get_option_zval_type(mysql_option);
 	if (expected_type != Z_TYPE_P(mysql_value)) {
 		switch (expected_type) {
 			case IS_STRING:
-				convert_to_string_ex(mysql_value);
+				if (!try_convert_to_string(mysql_value)) {
+					return;
+				}
 				break;
 			case IS_LONG:
 				convert_to_long_ex(mysql_value);
@@ -1891,6 +1857,9 @@ PHP_FUNCTION(mysqli_prepare)
 			memcpy(sqlstate, mysql->mysql->net.sqlstate, SQLSTATE_LENGTH+1);
 #else
 			MYSQLND_ERROR_INFO error_info = *mysql->mysql->data->error_info;
+			mysql->mysql->data->error_info->error_list.head = NULL;
+			mysql->mysql->data->error_info->error_list.tail = NULL;
+			mysql->mysql->data->error_info->error_list.count = 0;
 #endif
 			mysqli_stmt_close(stmt->stmt, FALSE);
 			stmt->stmt = NULL;
@@ -1901,6 +1870,7 @@ PHP_FUNCTION(mysqli_prepare)
 			memcpy(mysql->mysql->net.last_error, last_error, MYSQL_ERRMSG_SIZE);
 			memcpy(mysql->mysql->net.sqlstate, sqlstate, SQLSTATE_LENGTH+1);
 #else
+			zend_llist_clean(&mysql->mysql->data->error_info->error_list);
 			*mysql->mysql->data->error_info = error_info;
 #endif
 		}
@@ -1987,10 +1957,10 @@ PHP_FUNCTION(mysqli_real_escape_string) {
 	MYSQLI_FETCH_RESOURCE_CONN(mysql, mysql_link, MYSQLI_STATUS_VALID);
 
 	newstr = zend_string_alloc(2 * escapestr_len, 0);
-	newstr->len = mysql_real_escape_string(mysql->mysql, newstr->val, escapestr, escapestr_len);
-	newstr = zend_string_realloc(newstr, newstr->len, 0);
+	ZSTR_LEN(newstr) = mysql_real_escape_string(mysql->mysql, ZSTR_VAL(newstr), escapestr, escapestr_len);
+	newstr = zend_string_truncate(newstr, ZSTR_LEN(newstr), 0);
 
-	RETURN_STR(newstr);
+	RETURN_NEW_STR(newstr);
 }
 /* }}} */
 
@@ -2046,8 +2016,8 @@ PHP_FUNCTION(mysqli_stmt_send_long_data)
 }
 /* }}} */
 
-/* {{{ proto mixed mysqli_stmt_affected_rows(object stmt)
-   Return the number of rows affected in the last query for the given link */
+/* {{{ proto string|int|false mysqli_stmt_affected_rows(object stmt)
+   Return the number of rows affected in the last query for the given link. */
 PHP_FUNCTION(mysqli_stmt_affected_rows)
 {
 	MY_STMT			*stmt;
@@ -2255,7 +2225,7 @@ PHP_FUNCTION(mysqli_sqlstate)
 }
 /* }}} */
 
-/* {{{ proto bool mysqli_ssl_set(object link ,string key ,string cert ,string ca ,string capath ,string cipher]) U
+/* {{{ proto bool mysqli_ssl_set(object link ,string key ,string cert ,string ca ,string capath ,string cipher])
 */
 PHP_FUNCTION(mysqli_ssl_set)
 {
@@ -2314,7 +2284,7 @@ PHP_FUNCTION(mysqli_stat)
 
 /* }}} */
 
-/* {{{ proto bool mysqli_refresh(object link, long options)
+/* {{{ proto bool mysqli_refresh(object link, int options)
    Flush tables or caches, or reset replication server information */
 PHP_FUNCTION(mysqli_refresh)
 {
@@ -2334,7 +2304,7 @@ PHP_FUNCTION(mysqli_refresh)
 }
 /* }}} */
 
-/* {{{ proto int mysqli_stmt_attr_set(object stmt, long attr, long mode)
+/* {{{ proto int mysqli_stmt_attr_set(object stmt, int attr, int mode)
 */
 PHP_FUNCTION(mysqli_stmt_attr_set)
 {
@@ -2354,7 +2324,7 @@ PHP_FUNCTION(mysqli_stmt_attr_set)
 	MYSQLI_FETCH_RESOURCE_STMT(stmt, mysql_stmt, MYSQLI_STATUS_VALID);
 
 	if (mode_in < 0) {
-		php_error_docref(NULL, E_WARNING, "mode should be non-negative, %pd passed", mode_in);
+		php_error_docref(NULL, E_WARNING, "mode should be non-negative, " ZEND_LONG_FMT " passed", mode_in);
 		RETURN_FALSE;
 	}
 
@@ -2381,7 +2351,7 @@ PHP_FUNCTION(mysqli_stmt_attr_set)
 }
 /* }}} */
 
-/* {{{ proto int mysqli_stmt_attr_get(object stmt, long attr)
+/* {{{ proto int mysqli_stmt_attr_get(object stmt, int attr)
 */
 PHP_FUNCTION(mysqli_stmt_attr_get)
 {
@@ -2527,7 +2497,7 @@ PHP_FUNCTION(mysqli_stmt_result_metadata)
 }
 /* }}} */
 
-/* {{{ proto bool mysqli_stmt_store_result(stmt)
+/* {{{ proto bool mysqli_stmt_store_result(object stmt)
 */
 PHP_FUNCTION(mysqli_stmt_store_result)
 {
@@ -2559,7 +2529,7 @@ PHP_FUNCTION(mysqli_stmt_store_result)
 #if MYSQL_VERSION_ID >= 50107
 				my_bool	tmp=1;
 #else
-				uint tmp=1;
+				uint32_t tmp=1;
 #endif
 				mysql_stmt_attr_set(stmt->stmt, STMT_ATTR_UPDATE_MAX_LENGTH, &tmp);
 				break;
@@ -2596,7 +2566,7 @@ PHP_FUNCTION(mysqli_stmt_sqlstate)
 }
 /* }}} */
 
-/* {{{ proto object mysqli_store_result(object link [, flags])
+/* {{{ proto object mysqli_store_result(object link [, int flags])
    Buffer result set on client */
 PHP_FUNCTION(mysqli_store_result)
 {
@@ -2684,7 +2654,7 @@ PHP_FUNCTION(mysqli_use_result)
 }
 /* }}} */
 
-/* {{{ proto int mysqli_warning_count (object link)
+/* {{{ proto int mysqli_warning_count(object link)
    Return number of warnings from the last query for the given link */
 PHP_FUNCTION(mysqli_warning_count)
 {
@@ -2699,12 +2669,3 @@ PHP_FUNCTION(mysqli_warning_count)
 	RETURN_LONG(mysql_warning_count(mysql->mysql));
 }
 /* }}} */
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: noet sw=4 ts=4 fdm=marker
- * vim<600: noet sw=4 ts=4
- */

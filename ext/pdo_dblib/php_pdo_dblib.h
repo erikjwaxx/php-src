@@ -2,7 +2,7 @@
   +----------------------------------------------------------------------+
   | PHP Version 7                                                        |
   +----------------------------------------------------------------------+
-  | Copyright (c) 1997-2015 The PHP Group                                |
+  | Copyright (c) The PHP Group                                          |
   +----------------------------------------------------------------------+
   | This source file is subject to version 3.01 of the PHP license,      |
   | that is bundled with this package in the file LICENSE, and is        |
@@ -17,8 +17,6 @@
   +----------------------------------------------------------------------+
 */
 
-/* $Id$ */
-
 #ifndef PHP_PDO_DBLIB_H
 #define PHP_PDO_DBLIB_H
 
@@ -30,6 +28,9 @@ extern zend_module_entry pdo_dblib_module_entry;
 #define phpext_pdo_dblib_ptr &pdo_dblib_module_entry
 #endif
 
+#include "php_version.h"
+#define PHP_PDO_DBLIB_VERSION PHP_VERSION
+
 #ifdef ZTS
 # include "TSRM.h"
 #endif
@@ -40,4 +41,3 @@ PHP_MINFO_FUNCTION(pdo_dblib);
 PHP_RSHUTDOWN_FUNCTION(pdo_dblib);
 
 #endif
-

@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | PHP Version 7                                                        |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1997-2015 The PHP Group                                |
+   | Copyright (c) The PHP Group                                          |
    +----------------------------------------------------------------------+
    | This source file is subject to version 3.01 of the PHP license,      |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -15,8 +15,6 @@
    | Authors: Marcus Boerger <helly@php.net>                              |
    +----------------------------------------------------------------------+
  */
-
-/* $Id$ */
 
 #ifdef HAVE_CONFIG_H
 # include "config.h"
@@ -47,7 +45,7 @@ PHPAPI zend_class_entry *spl_ce_RangeException;
 PHPAPI zend_class_entry *spl_ce_UnderflowException;
 PHPAPI zend_class_entry *spl_ce_UnexpectedValueException;
 
-#define spl_ce_Exception zend_exception_get_default()
+#define spl_ce_Exception zend_ce_exception
 
 /* {{{ PHP_MINIT_FUNCTION(spl_exceptions) */
 PHP_MINIT_FUNCTION(spl_exceptions)
@@ -70,12 +68,3 @@ PHP_MINIT_FUNCTION(spl_exceptions)
 	return SUCCESS;
 }
 /* }}} */
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: fdm=marker
- * vim: noet sw=4 ts=4
- */

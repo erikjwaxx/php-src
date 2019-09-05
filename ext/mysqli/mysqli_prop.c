@@ -2,7 +2,7 @@
   +----------------------------------------------------------------------+
   | PHP Version 7                                                        |
   +----------------------------------------------------------------------+
-  | Copyright (c) 1997-2015 The PHP Group                                |
+  | Copyright (c) The PHP Group                                          |
   +----------------------------------------------------------------------+
   | This source file is subject to version 3.01 of the PHP license,      |
   | that is bundled with this package in the file LICENSE, and is        |
@@ -15,8 +15,6 @@
   | Author: Georg Richter <georg@php.net>                                |
   |         Andrey Hristov <andrey@php.net>                              |
   +----------------------------------------------------------------------+
-
-  $Id$
 */
 
 #ifdef HAVE_CONFIG_H
@@ -34,15 +32,15 @@
 #define CHECK_STATUS(value) \
 	if (!obj->ptr || ((MYSQLI_RESOURCE *)obj->ptr)->status < value ) { \
 		php_error_docref(NULL, E_WARNING, "Property access is not allowed yet"); \
-		ZVAL_NULL(retval); \
+		ZVAL_FALSE(retval); \
 		return retval; \
 	} \
 
 #define MYSQLI_GET_MYSQL(statusval) \
 MYSQL *p; \
 if (!obj->ptr || !(MY_MYSQL *)((MYSQLI_RESOURCE *)(obj->ptr))->ptr) { \
-	php_error_docref(NULL, E_WARNING, "Couldn't fetch %s", obj->zo.ce->name->val);\
-	ZVAL_NULL(retval);\
+	php_error_docref(NULL, E_WARNING, "Couldn't fetch %s", ZSTR_VAL(obj->zo.ce->name));\
+	ZVAL_FALSE(retval);\
 	return retval; \
 } else { \
 	CHECK_STATUS(statusval);\
@@ -52,7 +50,7 @@ if (!obj->ptr || !(MY_MYSQL *)((MYSQLI_RESOURCE *)(obj->ptr))->ptr) { \
 #define MYSQLI_GET_RESULT(statusval) \
 MYSQL_RES *p; \
 if (!obj->ptr) { \
-	php_error_docref(NULL, E_WARNING, "Couldn't fetch %s", obj->zo.ce->name->val);\
+	php_error_docref(NULL, E_WARNING, "Couldn't fetch %s", ZSTR_VAL(obj->zo.ce->name));\
 	ZVAL_NULL(retval);\
 	return retval; \
 } else { \
@@ -64,7 +62,7 @@ if (!obj->ptr) { \
 #define MYSQLI_GET_STMT(statusval) \
 MYSQL_STMT *p; \
 if (!obj->ptr) { \
-	php_error_docref(NULL, E_WARNING, "Couldn't fetch %s", obj->zo.ce->name->val);\
+	php_error_docref(NULL, E_WARNING, "Couldn't fetch %s", ZSTR_VAL(obj->zo.ce->name));\
 	ZVAL_NULL(retval);\
 	return retval; \
 } else { \
@@ -186,15 +184,15 @@ static zval *link_error_list_read(mysqli_object *obj, zval *retval)
 
  	mysql = (MY_MYSQL *)((MYSQLI_RESOURCE *)(obj->ptr))->ptr;
 
-	array_init(retval);
 	if (mysql) {
+		array_init(retval);
 #if defined(MYSQLI_USE_MYSQLND)
-		if (mysql->mysql->data->error_info->error_list) {
+		if (1) {
 			MYSQLND_ERROR_LIST_ELEMENT * message;
 			zend_llist_position pos;
-			for (message = (MYSQLND_ERROR_LIST_ELEMENT *) zend_llist_get_first_ex(mysql->mysql->data->error_info->error_list, &pos);
+			for (message = (MYSQLND_ERROR_LIST_ELEMENT *) zend_llist_get_first_ex(&mysql->mysql->data->error_info->error_list, &pos);
 				 message;
-				 message = (MYSQLND_ERROR_LIST_ELEMENT *) zend_llist_get_next_ex(mysql->mysql->data->error_info->error_list, &pos))
+				 message = (MYSQLND_ERROR_LIST_ELEMENT *) zend_llist_get_next_ex(&mysql->mysql->data->error_info->error_list, &pos))
 			{
 				zval single_error;
 				array_init(&single_error);
@@ -214,6 +212,8 @@ static zval *link_error_list_read(mysqli_object *obj, zval *retval)
 			add_next_index_zval(retval, &single_error);
 		}
 #endif
+	} else {
+		ZVAL_EMPTY_ARRAY(retval);
 	}
 
 	return retval;
@@ -233,38 +233,6 @@ MYSQLI_MAP_PROPERTY_FUNC_LONG(link_server_version_read, mysql_get_server_version
 MYSQLI_MAP_PROPERTY_FUNC_STRING(link_sqlstate_read, mysql_sqlstate, MYSQLI_GET_MYSQL(MYSQLI_STATUS_VALID))
 MYSQLI_MAP_PROPERTY_FUNC_LONG(link_thread_id_read, mysql_thread_id, MYSQLI_GET_MYSQL(MYSQLI_STATUS_VALID), zend_ulong, ZEND_ULONG_FMT)
 MYSQLI_MAP_PROPERTY_FUNC_LONG(link_warning_count_read, mysql_warning_count, MYSQLI_GET_MYSQL(MYSQLI_STATUS_VALID), zend_ulong, ZEND_ULONG_FMT)
-
-/* {{{ property link_stat_read */
-static zval *link_stat_read(mysqli_object *obj, zval *retval)
-{
-	MY_MYSQL *mysql;
-
-	ZVAL_NULL(retval);
-
-#if defined(MYSQLI_USE_MYSQLND)
-	CHECK_STATUS(MYSQLI_STATUS_INITIALIZED);
-#else
-	CHECK_STATUS(MYSQLI_STATUS_VALID);
-#endif
-
- 	mysql = (MY_MYSQL *)((MYSQLI_RESOURCE *)(obj->ptr))->ptr;
-
-	if (mysql) {
-#if defined(MYSQLI_USE_MYSQLND)
-		zend_string * stat_msg;
-		if (mysqlnd_stat(mysql->mysql, &stat_msg) == PASS) {
-			ZVAL_STR(retval, stat_msg);
-		}
-#else
-		char * stat_msg;
-		if ((stat_msg = (char *)mysql_stat(mysql->mysql))) {
-			ZVAL_STRING(retval, stat_msg);
-		}
-#endif
-	}
-	return retval;
-}
-/* }}} */
 
 /* result properties */
 
@@ -289,8 +257,12 @@ static zval *result_type_read(mysqli_object *obj, zval *retval)
 static zval *result_lengths_read(mysqli_object *obj, zval *retval)
 {
 	MYSQL_RES *p;
-	zend_ulong *ret;
-	uint field_count;
+#if defined(MYSQLI_USE_MYSQLND)
+	const size_t *ret;
+#else
+	const zend_ulong *ret;
+#endif
+	uint32_t field_count;
 
 	CHECK_STATUS(MYSQLI_STATUS_VALID);
 	p = (MYSQL_RES *)((MYSQLI_RESOURCE *)(obj->ptr))->ptr;
@@ -372,15 +344,15 @@ static zval *stmt_error_list_read(mysqli_object *obj, zval *retval)
 	CHECK_STATUS(MYSQLI_STATUS_INITIALIZED);
 
  	stmt = (MY_STMT *)((MYSQLI_RESOURCE *)(obj->ptr))->ptr;
-	array_init(retval);
 	if (stmt && stmt->stmt) {
+		array_init(retval);
 #if defined(MYSQLI_USE_MYSQLND)
-		if (stmt->stmt->data && stmt->stmt->data->error_info->error_list) {
+		if (stmt->stmt->data && stmt->stmt->data->error_info) {
 			MYSQLND_ERROR_LIST_ELEMENT * message;
 			zend_llist_position pos;
-			for (message = (MYSQLND_ERROR_LIST_ELEMENT *) zend_llist_get_first_ex(stmt->stmt->data->error_info->error_list, &pos);
+			for (message = (MYSQLND_ERROR_LIST_ELEMENT *) zend_llist_get_first_ex(&stmt->stmt->data->error_info->error_list, &pos);
 				 message;
-				 message = (MYSQLND_ERROR_LIST_ELEMENT *) zend_llist_get_next_ex(stmt->stmt->data->error_info->error_list, &pos))
+				 message = (MYSQLND_ERROR_LIST_ELEMENT *) zend_llist_get_next_ex(&stmt->stmt->data->error_info->error_list, &pos))
 			{
 				zval single_error;
 				array_init(&single_error);
@@ -400,6 +372,8 @@ static zval *stmt_error_list_read(mysqli_object *obj, zval *retval)
 			add_next_index_zval(retval, &single_error);
 		}
 #endif
+	} else {
+		ZVAL_EMPTY_ARRAY(retval);
 	}
 	return retval;
 }
@@ -429,7 +403,6 @@ const mysqli_property_entry mysqli_link_property_entries[] = {
 	{"insert_id",		sizeof("insert_id") - 1,		link_insert_id_read, NULL},
 	{"server_info",		sizeof("server_info") - 1,		link_server_info_read, NULL},
 	{"server_version",	sizeof("server_version") - 1,	link_server_version_read, NULL},
-	{"stat",			sizeof("stat") - 1,				link_stat_read, NULL},
 	{"sqlstate",		sizeof("sqlstate") - 1,			link_sqlstate_read, NULL},
 	{"protocol_version",sizeof("protocol_version") - 1,	link_protocol_version_read, NULL},
 	{"thread_id",		sizeof("thread_id") - 1, 		link_thread_id_read, NULL},
@@ -460,12 +433,3 @@ const mysqli_property_entry mysqli_stmt_property_entries[] = {
 	{"id",			sizeof("id") - 1,			stmt_id_read, NULL},
 	{NULL, 0, NULL, NULL}
 };
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: noet sw=4 ts=4 fdm=marker
- * vim<600: noet sw=4 ts=4
- */

@@ -6,6 +6,8 @@ require_once('skipif.inc');
 require_once('skipifemb.inc');
 require_once('skipifconnectfailure.inc');
 ?>
+--INI--
+mysqli.allow_local_infile=1
 --FILE--
 <?php
 	require("connect.inc");
@@ -20,6 +22,7 @@ require_once('skipifconnectfailure.inc');
 		'MYSQLI_READ_DEFAULT_FILE'			=> true,
 		'MYSQLI_OPT_CONNECT_TIMEOUT'		=> true,
 		'MYSQLI_OPT_LOCAL_INFILE'			=> true,
+		'MYSQLI_OPT_READ_TIMEOUT'			=> true,
 		'MYSQLI_INIT_COMMAND'				=> true,
 		'MYSQLI_CLIENT_SSL'					=> true,
 		"MYSQLI_CLIENT_COMPRESS"			=> true,
@@ -136,6 +139,12 @@ require_once('skipifconnectfailure.inc');
 		$expected_constants['MYSQLI_SERVER_QUERY_WAS_SLOW'] = true;
 	}
 
+	if ($version >= 50033 || $IS_MYSQLND) {
+		$expected_constants['MYSQLI_CLIENT_SSL_VERIFY_SERVER_CERT'] = true;
+	}
+	if ($IS_MYSQLND) {
+		$expected_constants['MYSQLI_CLIENT_SSL_DONT_VERIFY_SERVER_CERT'] = true;
+	}
 
 	/* First introduced in MySQL 6.0, backported to MySQL 5.5 */
 	if ($version >= 50606 || $IS_MYSQLND) {
@@ -193,10 +202,14 @@ require_once('skipifconnectfailure.inc');
 		}
 	}
 
-	if (($IS_MYSQLND && version_compare(PHP_VERSION, ' 5.4.12-dev', '>=')) || (!$IS_MYSQLND && ($version > 50610))) {
+	if ($IS_MYSQLND || (!$IS_MYSQLND && ($version > 50610))) {
 		/* could be that MySQL/libmysql 5.6.9 had the flag already but it was no stable release */
 		$expected_constants["MYSQLI_OPT_CAN_HANDLE_EXPIRED_PASSWORDS"] = true;
 		$expected_constants["MYSQLI_CLIENT_CAN_HANDLE_EXPIRED_PASSWORDS"] = true;
+	}
+
+	if ($IS_MYSQLND) {
+		$expected_constants["MYSQLI_TYPE_JSON"]	= true;
 	}
 
 	$unexpected_constants = array();
@@ -226,5 +239,5 @@ require_once('skipifconnectfailure.inc');
 
 	print "done!";
 ?>
---EXPECTF--
+--EXPECT--
 done!

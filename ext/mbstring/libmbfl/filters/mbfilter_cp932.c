@@ -66,7 +66,9 @@ const mbfl_encoding mbfl_encoding_cp932 = {
 	"Shift_JIS",
 	(const char *(*)[])&mbfl_encoding_cp932_aliases,
 	mblen_table_sjis,
-	MBFL_ENCTYPE_MBCS | MBFL_ENCTYPE_GL_UNSAFE
+	MBFL_ENCTYPE_MBCS | MBFL_ENCTYPE_GL_UNSAFE,
+	&vtbl_cp932_wchar,
+	&vtbl_wchar_cp932
 };
 
 const struct mbfl_identify_vtbl vtbl_identify_cp932 = {
@@ -319,9 +321,7 @@ mbfl_filt_conv_wchar_cp932(int c, mbfl_convert_filter *filter)
 			CK((*filter->output_function)(s2, filter->data));
 		}
 	} else {
-		if (filter->illegal_mode != MBFL_OUTPUTFILTER_ILLEGAL_MODE_NONE) {
-			CK(mbfl_filt_conv_illegal_output(c, filter));
-		}
+		CK(mbfl_filt_conv_illegal_output(c, filter));
 	}
 
 	return c;
@@ -346,5 +346,3 @@ static int mbfl_filt_ident_cp932(int c, mbfl_identify_filter *filter)
 
 	return c;
 }
-
-

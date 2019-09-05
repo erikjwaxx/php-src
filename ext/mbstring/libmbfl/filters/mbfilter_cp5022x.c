@@ -54,7 +54,9 @@ const mbfl_encoding mbfl_encoding_jis_ms = {
 	"ISO-2022-JP",
 	NULL,
 	NULL,
-	MBFL_ENCTYPE_MBCS | MBFL_ENCTYPE_SHFTCODE | MBFL_ENCTYPE_GL_UNSAFE
+	MBFL_ENCTYPE_MBCS | MBFL_ENCTYPE_SHFTCODE | MBFL_ENCTYPE_GL_UNSAFE,
+	&vtbl_jis_ms_wchar,
+	&vtbl_wchar_jis_ms
 };
 
 const mbfl_encoding mbfl_encoding_cp50220 = {
@@ -63,7 +65,9 @@ const mbfl_encoding mbfl_encoding_cp50220 = {
 	"ISO-2022-JP",
 	(const char *(*)[])NULL,
 	NULL,
-	MBFL_ENCTYPE_MBCS | MBFL_ENCTYPE_SHFTCODE | MBFL_ENCTYPE_GL_UNSAFE
+	MBFL_ENCTYPE_MBCS | MBFL_ENCTYPE_SHFTCODE | MBFL_ENCTYPE_GL_UNSAFE,
+	&vtbl_cp50220_wchar,
+	&vtbl_wchar_cp50220
 };
 
 const mbfl_encoding mbfl_encoding_cp50220raw = {
@@ -72,7 +76,9 @@ const mbfl_encoding mbfl_encoding_cp50220raw = {
 	"ISO-2022-JP",
 	(const char *(*)[])NULL,
 	NULL,
-	MBFL_ENCTYPE_MBCS | MBFL_ENCTYPE_SHFTCODE | MBFL_ENCTYPE_GL_UNSAFE
+	MBFL_ENCTYPE_MBCS | MBFL_ENCTYPE_SHFTCODE | MBFL_ENCTYPE_GL_UNSAFE,
+	&vtbl_cp50220raw_wchar,
+	&vtbl_wchar_cp50220raw
 };
 
 const mbfl_encoding mbfl_encoding_cp50221 = {
@@ -81,7 +87,9 @@ const mbfl_encoding mbfl_encoding_cp50221 = {
 	"ISO-2022-JP",
 	NULL,
 	NULL,
-	MBFL_ENCTYPE_MBCS | MBFL_ENCTYPE_SHFTCODE | MBFL_ENCTYPE_GL_UNSAFE
+	MBFL_ENCTYPE_MBCS | MBFL_ENCTYPE_SHFTCODE | MBFL_ENCTYPE_GL_UNSAFE,
+	&vtbl_cp50221_wchar,
+	&vtbl_wchar_cp50221
 };
 
 const mbfl_encoding mbfl_encoding_cp50222 = {
@@ -90,7 +98,9 @@ const mbfl_encoding mbfl_encoding_cp50222 = {
 	"ISO-2022-JP",
 	NULL,
 	NULL,
-	MBFL_ENCTYPE_MBCS | MBFL_ENCTYPE_SHFTCODE | MBFL_ENCTYPE_GL_UNSAFE
+	MBFL_ENCTYPE_MBCS | MBFL_ENCTYPE_SHFTCODE | MBFL_ENCTYPE_GL_UNSAFE,
+	&vtbl_cp50222_wchar,
+	&vtbl_wchar_cp50222
 };
 
 const struct mbfl_identify_vtbl vtbl_identify_jis_ms = {
@@ -278,7 +288,7 @@ retry:
 					w = cp932ext1_ucs_table[s - cp932ext1_ucs_table_min];
 				} else if (s >= cp932ext2_ucs_table_min && s < cp932ext2_ucs_table_max) {
 					w = cp932ext2_ucs_table[s - cp932ext2_ucs_table_min];
-				} else if (s >= cp932ext3_ucs_table_min && s < cp932ext2_ucs_table_max) {
+				} else if (s >= cp932ext3_ucs_table_min && s < cp932ext3_ucs_table_max) {
 					w = cp932ext3_ucs_table[s - cp932ext3_ucs_table_min];
 				} else if (s >= 94 * 94 && s < 114 * 94) {
 					/* user-defined => PUA (Microsoft extended) */
@@ -553,9 +563,7 @@ mbfl_filt_conv_wchar_jis_ms(int c, mbfl_convert_filter *filter)
 			CK((*filter->output_function)(s & 0x7f, filter->data));
 		}
 	} else {
-		if (filter->illegal_mode != MBFL_OUTPUTFILTER_ILLEGAL_MODE_NONE) {
-			CK(mbfl_filt_conv_illegal_output(c, filter));
-		}
+		CK(mbfl_filt_conv_illegal_output(c, filter));
 	}
 
 	return c;
@@ -766,9 +774,7 @@ mbfl_filt_conv_wchar_cp50221(int c, mbfl_convert_filter *filter)
 			CK((*filter->output_function)((s >> 8) & 0x7f, filter->data));
 			CK((*filter->output_function)(s & 0x7f, filter->data));
 		} else if (s < 0x10000) { /* X0212 */
-			if (filter->illegal_mode != MBFL_OUTPUTFILTER_ILLEGAL_MODE_NONE) {
-				CK(mbfl_filt_conv_illegal_output(c, filter));
-			}
+			CK(mbfl_filt_conv_illegal_output(c, filter));
 		} else { /* X 0201 latin */
 			if ((filter->status & 0xff00) != 0x400) {
 				CK((*filter->output_function)(0x1b, filter->data));		/* ESC */
@@ -779,9 +785,7 @@ mbfl_filt_conv_wchar_cp50221(int c, mbfl_convert_filter *filter)
 			CK((*filter->output_function)(s & 0x7f, filter->data));
 		}
 	} else {
-		if (filter->illegal_mode != MBFL_OUTPUTFILTER_ILLEGAL_MODE_NONE) {
-			CK(mbfl_filt_conv_illegal_output(c, filter));
-		}
+		CK(mbfl_filt_conv_illegal_output(c, filter));
 	}
 
 	return c;
@@ -918,9 +922,7 @@ mbfl_filt_conv_wchar_cp50222(int c, mbfl_convert_filter *filter)
 			CK((*filter->output_function)((s >> 8) & 0x7f, filter->data));
 			CK((*filter->output_function)(s & 0x7f, filter->data));
 		} else if (s < 0x10000) { /* X0212 */
-			if (filter->illegal_mode != MBFL_OUTPUTFILTER_ILLEGAL_MODE_NONE) {
-				CK(mbfl_filt_conv_illegal_output(c, filter));
-			}
+			CK(mbfl_filt_conv_illegal_output(c, filter));
 		} else { /* X 0201 latin */
 			if ((filter->status & 0xff00) == 0x500) {
 				CK((*filter->output_function)(0x0f, filter->data));		/* SO */
@@ -935,9 +937,7 @@ mbfl_filt_conv_wchar_cp50222(int c, mbfl_convert_filter *filter)
 			CK((*filter->output_function)(s & 0x7f, filter->data));
 		}
 	} else {
-		if (filter->illegal_mode != MBFL_OUTPUTFILTER_ILLEGAL_MODE_NONE) {
-			CK(mbfl_filt_conv_illegal_output(c, filter));
-		}
+		CK(mbfl_filt_conv_illegal_output(c, filter));
 	}
 
 	return c;
@@ -1291,6 +1291,3 @@ retry:
 
 	return c;
 }
-
-
-

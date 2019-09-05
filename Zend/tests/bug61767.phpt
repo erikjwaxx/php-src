@@ -17,9 +17,9 @@ $undefined->foo();
 --EXPECTF--
 Error handler called (Undefined variable: undefined)
 
-Fatal error: Uncaught exception 'ErrorException' with message 'Undefined variable: undefined' in %sbug61767.php:%d
+Fatal error: Uncaught ErrorException: Undefined variable: undefined in %sbug61767.php:%d
 Stack trace:
-#0 %sbug61767.php(%d): {closure}(%s, 'Undefined varia...', '%s', %d, Array)
+#0 %sbug61767.php(%d): {closure}(%s, 'Undefined varia...', '%s', %d)
 #1 {main}
   thrown in %sbug61767.php on line %d
 Shutting down

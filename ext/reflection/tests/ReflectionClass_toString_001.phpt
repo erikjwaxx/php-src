@@ -8,20 +8,20 @@ Steve Seear <stevseea@php.net>
 $rc = new ReflectionClass("ReflectionClass");
 echo $rc;
 ?>
---EXPECTF--
+--EXPECT--
 Class [ <internal:Reflection> class ReflectionClass implements Reflector ] {
 
   - Constants [3] {
-    Constant [ integer IS_IMPLICIT_ABSTRACT ] { 16 }
-    Constant [ integer IS_EXPLICIT_ABSTRACT ] { 32 }
-    Constant [ integer IS_FINAL ] { 4 }
+    Constant [ public int IS_IMPLICIT_ABSTRACT ] { 16 }
+    Constant [ public int IS_EXPLICIT_ABSTRACT ] { 64 }
+    Constant [ public int IS_FINAL ] { 32 }
   }
 
   - Static properties [0] {
   }
 
   - Static methods [1] {
-    Method [ <internal:Reflection, prototype Reflector> static public method export ] {
+    Method [ <internal, deprecated:Reflection> static public method export ] {
 
       - Parameters [2] {
         Parameter #0 [ <required> $argument ]
@@ -34,7 +34,7 @@ Class [ <internal:Reflection> class ReflectionClass implements Reflector ] {
     Property [ <default> public $name ]
   }
 
-  - Methods [49] {
+  - Methods [53] {
     Method [ <internal:Reflection> final private method __clone ] {
 
       - Parameters [0] {
@@ -67,6 +67,12 @@ Class [ <internal:Reflection> class ReflectionClass implements Reflector ] {
     }
 
     Method [ <internal:Reflection> public method isUserDefined ] {
+
+      - Parameters [0] {
+      }
+    }
+
+    Method [ <internal:Reflection> public method isAnonymous ] {
 
       - Parameters [0] {
       }
@@ -169,7 +175,20 @@ Class [ <internal:Reflection> class ReflectionClass implements Reflector ] {
       }
     }
 
+    Method [ <internal:Reflection> public method getReflectionConstants ] {
+
+      - Parameters [0] {
+      }
+    }
+
     Method [ <internal:Reflection> public method getConstant ] {
+
+      - Parameters [1] {
+        Parameter #0 [ <required> $name ]
+      }
+    }
+
+    Method [ <internal:Reflection> public method getReflectionConstant ] {
 
       - Parameters [1] {
         Parameter #0 [ <required> $name ]
@@ -246,7 +265,7 @@ Class [ <internal:Reflection> class ReflectionClass implements Reflector ] {
     Method [ <internal:Reflection> public method newInstance ] {
 
       - Parameters [1] {
-        Parameter #0 [ <required> $args ]
+        Parameter #0 [ <optional> ...$args ]
       }
     }
 
@@ -299,6 +318,12 @@ Class [ <internal:Reflection> class ReflectionClass implements Reflector ] {
     }
 
     Method [ <internal:Reflection> public method getDefaultProperties ] {
+
+      - Parameters [0] {
+      }
+    }
+
+    Method [ <internal:Reflection> public method isIterable ] {
 
       - Parameters [0] {
       }

@@ -2,7 +2,7 @@
   +----------------------------------------------------------------------+
   | PHP Version 7                                                        |
   +----------------------------------------------------------------------+
-  | Copyright (c) 1997-2015 The PHP Group                                |
+  | Copyright (c) The PHP Group                                          |
   +----------------------------------------------------------------------+
   | This source file is subject to version 3.01 of the PHP license,      |
   | that is bundled with this package in the file LICENSE, and is        |
@@ -14,8 +14,6 @@
   +----------------------------------------------------------------------+
   | Author: Georg Richter <georg@php.net>                                |
   +----------------------------------------------------------------------+
-
-  $Id: php_mysqli_structs.h 302179 2010-08-13 09:57:04Z andrey $
 */
 
 #ifndef MYSQLI_PRIV_H
@@ -33,7 +31,7 @@
 #define HAVE_MYSQLI_GET_CHARSET
 #endif
 
-#if defined(MYSQLND_VERSION_ID) || (MYSQL_VERSION_ID > 40112 && MYSQL_VERSION_ID < 50000) || MYSQL_VERSION_ID > 50005
+#if defined(MYSQLND_VERSION_ID) || MYSQL_VERSION_ID > 50005
 #define HAVE_MYSQLI_SET_CHARSET
 #endif
 
@@ -78,10 +76,6 @@ extern void php_mysqli_report_error(const char *sqlstate, int errorno, const cha
 extern void php_mysqli_report_index(const char *query, unsigned int status);
 extern void php_mysqli_throw_sql_exception(char *sqlstate, int errorno, char *format, ...);
 
-#ifdef HAVE_SPL
-extern PHPAPI zend_class_entry *spl_ce_RuntimeException;
-#endif
-
 #define PHP_MYSQLI_EXPORT(__type) PHP_MYSQLI_API __type
 
 PHP_MYSQLI_EXPORT(zend_object *) mysqli_objects_new(zend_class_entry *);
@@ -96,6 +90,7 @@ PHP_MYSQLI_EXPORT(zend_object *) mysqli_objects_new(zend_class_entry *);
 	mysql->multi_query = 1; \
 }
 
+/* Numbers that cannot be represented as a signed int are converted to a string instead (affects 32-bit builds). */
 #define MYSQLI_RETURN_LONG_INT(__val) \
 { \
 	if ((__val) < ZEND_LONG_MAX) {		\
@@ -146,6 +141,6 @@ if ((MyG(report_mode) & MYSQLI_REPORT_ERROR) && mysql_stmt_errno(stmt)) { \
 
 void mysqli_common_connect(INTERNAL_FUNCTION_PARAMETERS, zend_bool is_real_connect, zend_bool in_ctor);
 
-void php_mysqli_init(INTERNAL_FUNCTION_PARAMETERS);
+void php_mysqli_init(INTERNAL_FUNCTION_PARAMETERS, zend_bool is_method);
 
 #endif /* MYSQLI_PRIV_H */

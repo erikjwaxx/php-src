@@ -31,44 +31,41 @@ echo $o;
 
 echo "===NONE===\n";
 
-function my_error_handler($errno, $errstr, $errfile, $errline) {
-	var_dump($errstr);
-}
-
-set_error_handler('my_error_handler');
-
-class None
+class NoneTest
 {
 	function __toString() {
 	}
 }
 
-$o = new None;
-echo $o;
+$o = new NoneTest;
+try {
+    echo $o;
+} catch (Error $e) {
+    echo $e->getMessage(), "\n";
+}
 
 echo "===THROW===\n";
 
-class Error 
+class ErrorTest
 {
 	function __toString() {
 		throw new Exception("This is an error!");
 	}
 }
 
-$o = new Error;
+$o = new ErrorTest;
 try {
 	echo $o;
-}
-catch (Exception $e) {
-	echo "Got the exception\n";
+} catch (Exception $e) {
+	echo $e->getMessage(), "\n";
 }
 
 ?>
 ===DONE===
---EXPECTF--
+--EXPECT--
 Hello World!
 ===NONE===
-string(52) "Method None::__toString() must return a string value"
+Method NoneTest::__toString() must return a string value
 ===THROW===
-
-Fatal error: Method Error::__toString() must not throw an exception in %sbug26166.php on line %d
+This is an error!
+===DONE===

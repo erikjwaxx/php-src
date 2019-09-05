@@ -2,13 +2,13 @@
 MySQL PDO->__construct(), PDO::ATTR_PERSISTENT
 --SKIPIF--
 <?php
-require_once(dirname(__FILE__) . DIRECTORY_SEPARATOR . 'skipif.inc');
-require_once(dirname(__FILE__) . DIRECTORY_SEPARATOR . 'mysql_pdo_test.inc');
+require_once(__DIR__ . DIRECTORY_SEPARATOR . 'skipif.inc');
+require_once(__DIR__ . DIRECTORY_SEPARATOR . 'mysql_pdo_test.inc');
 MySQLPDOTest::skip();
 ?>
 --FILE--
 <?php
-	require_once(dirname(__FILE__) . DIRECTORY_SEPARATOR . 'mysql_pdo_test.inc');
+	require_once(__DIR__ . DIRECTORY_SEPARATOR . 'mysql_pdo_test.inc');
 
 	try {
 
@@ -85,13 +85,15 @@ MySQLPDOTest::skip();
 
 
 	} catch (PDOException $e) {
-		printf("[001] %s, [%s] %s\n",
+		printf("[001] %s, [%s] %s [%s] %s\n",
 			$e->getMessage(),
-			(is_object($db)) ? $db->errorCode() : 'n/a',
-			(is_object($db)) ? implode(' ', $db->errorInfo()) : 'n/a');
+			(is_object($db1)) ? $db1->errorCode() : 'n/a',
+			(is_object($db1)) ? implode(' ', $db1->errorInfo()) : 'n/a',
+			(is_object($db2)) ? $db2->errorCode() : 'n/a',
+			(is_object($db2)) ? implode(' ', $db2->errorInfo()) : 'n/a');
 	}
 
 	print "done!";
 ?>
---EXPECTF--
+--EXPECT--
 done!

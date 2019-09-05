@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | Zend Engine                                                          |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1998-2015 Zend Technologies Ltd. (http://www.zend.com) |
+   | Copyright (c) Zend Technologies Ltd. (http://www.zend.com)           |
    +----------------------------------------------------------------------+
    | This source file is subject to version 2.00 of the Zend license,     |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -12,12 +12,10 @@
    | obtain it through the world-wide-web, please send a note to          |
    | license@zend.com so we can mail you a copy immediately.              |
    +----------------------------------------------------------------------+
-   | Authors: Andi Gutmans <andi@zend.com>                                |
-   |          Zeev Suraski <zeev@zend.com>                                |
+   | Authors: Andi Gutmans <andi@php.net>                                 |
+   |          Zeev Suraski <zeev@php.net>                                 |
    +----------------------------------------------------------------------+
 */
-
-/* $Id$ */
 
 #ifndef ZEND_CONFIG_W32_H
 #define ZEND_CONFIG_W32_H
@@ -40,9 +38,6 @@
 
 #include <float.h>
 
-typedef unsigned long ulong;
-typedef unsigned int uint;
-
 #define HAVE_STDIOSTR_H 1
 #define HAVE_CLASS_ISTDIOSTREAM
 #define istdiostream stdiostream
@@ -50,30 +45,29 @@ typedef unsigned int uint;
 #if _MSC_VER < 1900
 #define snprintf _snprintf
 #endif
-#if _MSC_VER < 1500
-#define vsnprintf _vsnprintf
-#endif
-#define strcasecmp(s1, s2) stricmp(s1, s2)
-#define strncasecmp(s1, s2, n) strnicmp(s1, s2, n)
+#define strcasecmp(s1, s2) _stricmp(s1, s2)
+#define strncasecmp(s1, s2, n) _strnicmp(s1, s2, n)
+#if defined(__cplusplus) && __cplusplus >= 201103L
+extern "C++" {
+#include <cmath>
+#define zend_isnan std::isnan
+#define zend_isinf std::isinf
+#define zend_finite std::isfinite
+}
+#else
 #define zend_isinf(a)	((_fpclass(a) == _FPCLASS_PINF) || (_fpclass(a) == _FPCLASS_NINF))
 #define zend_finite(x)	_finite(x)
 #define zend_isnan(x)	_isnan(x)
+#endif
 
-#define zend_sprintf sprintf
-
+#ifndef __cplusplus
 /* This will cause the compilation process to be MUCH longer, but will generate
  * a much quicker PHP binary
  */
 #ifdef ZEND_WIN32_FORCE_INLINE
-/* _ALLOW_KEYWORD_MACROS is only relevant for C++ */
-# if (_MSC_VER >= 1700) && !defined(_ALLOW_KEYWORD_MACROS)
-#  define _ALLOW_KEYWORD_MACROS
-# endif
 # undef inline
 # define inline __forceinline
-#elif !defined(ZEND_WIN32_KEEP_INLINE)
-# undef inline
-# define inline
+#endif
 #endif
 
 #ifdef LIBZEND_EXPORTS
@@ -85,23 +79,4 @@ typedef unsigned int uint;
 #define ZEND_DLEXPORT		__declspec(dllexport)
 #define ZEND_DLIMPORT		__declspec(dllimport)
 
-/* 0x00200000L is MB_SERVICE_NOTIFICATION, which is only supported under Windows NT
- * (and requires _WIN32_WINNT to be defined, which prevents the resulting executable
- * from running under Windows 9x
- * Windows 9x should silently ignore it, so it's being used here directly
- */
-#ifndef MB_SERVICE_NOTIFICATION
-#define	MB_SERVICE_NOTIFICATION		0x00200000L
-#endif
-
-#define ZEND_SERVICE_MB_STYLE		(MB_TOPMOST|MB_SERVICE_NOTIFICATION)
-
 #endif /* ZEND_CONFIG_W32_H */
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * indent-tabs-mode: t
- * End:
- */

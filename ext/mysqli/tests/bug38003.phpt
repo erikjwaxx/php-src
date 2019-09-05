@@ -16,5 +16,8 @@ $DB = new DB();
 
 echo "Done\n";
 ?>
---EXPECTF--	
-Fatal error: Call to private DB::__construct() from invalid context in %s on line %d
+--EXPECTF--
+Fatal error: Uncaught Error: Call to private DB::__construct() from invalid context in %s
+Stack trace:
+#0 {main}
+  thrown in %s

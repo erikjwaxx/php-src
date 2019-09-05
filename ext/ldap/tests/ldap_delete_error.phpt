@@ -12,13 +12,6 @@ require "connect.inc";
 
 $link = ldap_connect_and_bind($host, $port, $user, $passwd, $protocol_version);
 
-// Too few parameters
-var_dump(ldap_delete());
-var_dump(ldap_delete($link));
-
-// Too many parameters
-var_dump(ldap_delete($link, "dc=my-domain,dc=com", "Additional data"));
-
 // Invalid DN
 var_dump(
 	ldap_delete($link, "weirdAttribute=val"),
@@ -28,7 +21,7 @@ var_dump(
 
 // Deleting unexisting data
 var_dump(
-	ldap_delete($link, "dc=my-domain,dc=com"),
+	ldap_delete($link, "dc=my-domain,$base"),
 	ldap_error($link),
 	ldap_errno($link)
 );
@@ -41,15 +34,6 @@ require "connect.inc";
 $link = ldap_connect_and_bind($host, $port, $user, $passwd, $protocol_version);
 ?>
 --EXPECTF--
-Warning: ldap_delete() expects exactly 2 parameters, 0 given in %s on line %d
-NULL
-
-Warning: ldap_delete() expects exactly 2 parameters, 1 given in %s on line %d
-NULL
-
-Warning: ldap_delete() expects exactly 2 parameters, 3 given in %s on line %d
-NULL
-
 Warning: ldap_delete(): Delete: Invalid DN syntax in %s on line %d
 bool(false)
 string(17) "Invalid DN syntax"

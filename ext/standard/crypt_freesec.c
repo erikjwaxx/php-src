@@ -1,7 +1,4 @@
 /*
-  $Id$
-*/
-/*
  * This version is derived from the original implementation of FreeSec
  * (release 1.1) by David Burren.  I've reviewed the changes made in
  * OpenBSD (as of 2.7) and modified the original code in a similar way
@@ -41,7 +38,6 @@
  * SUCH DAMAGE.
  *
  *	$Owl: Owl/packages/glibc/crypt_freesec.c,v 1.4 2005/11/16 13:08:32 solar Exp $
- *	$Id$
  *
  * This is an original implementation of the DES and the crypt(3) interfaces
  * by David Burren <davidb at werj.com.au>.
@@ -73,25 +69,25 @@
 
 #define _PASSWORD_EFMT1 '_'
 
-static u_char	IP[64] = {
+static const u_char	IP[64] = {
 	58, 50, 42, 34, 26, 18, 10,  2, 60, 52, 44, 36, 28, 20, 12,  4,
 	62, 54, 46, 38, 30, 22, 14,  6, 64, 56, 48, 40, 32, 24, 16,  8,
 	57, 49, 41, 33, 25, 17,  9,  1, 59, 51, 43, 35, 27, 19, 11,  3,
 	61, 53, 45, 37, 29, 21, 13,  5, 63, 55, 47, 39, 31, 23, 15,  7
 };
 
-static u_char	key_perm[56] = {
+static const u_char	key_perm[56] = {
 	57, 49, 41, 33, 25, 17,  9,  1, 58, 50, 42, 34, 26, 18,
 	10,  2, 59, 51, 43, 35, 27, 19, 11,  3, 60, 52, 44, 36,
 	63, 55, 47, 39, 31, 23, 15,  7, 62, 54, 46, 38, 30, 22,
 	14,  6, 61, 53, 45, 37, 29, 21, 13,  5, 28, 20, 12,  4
 };
 
-static u_char	key_shifts[16] = {
+static const u_char	key_shifts[16] = {
 	1, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1
 };
 
-static u_char	comp_perm[48] = {
+static const u_char	comp_perm[48] = {
 	14, 17, 11, 24,  1,  5,  3, 28, 15,  6, 21, 10,
 	23, 19, 12,  4, 26,  8, 16,  7, 27, 20, 13,  2,
 	41, 52, 31, 37, 47, 55, 30, 40, 51, 45, 33, 48,
@@ -102,7 +98,7 @@ static u_char	comp_perm[48] = {
  *	No E box is used, as it's replaced by some ANDs, shifts, and ORs.
  */
 
-static u_char	sbox[8][64] = {
+static const u_char	sbox[8][64] = {
 	{
 		14,  4, 13,  1,  2, 15, 11,  8,  3, 10,  6, 12,  5,  9,  0,  7,
 		 0, 15,  7,  4, 14,  2, 13,  1, 10,  6, 12, 11,  9,  5,  3,  8,
@@ -153,12 +149,12 @@ static u_char	sbox[8][64] = {
 	}
 };
 
-static u_char	pbox[32] = {
+static const u_char	pbox[32] = {
 	16,  7, 20, 21, 29, 12, 28, 17,  1, 15, 23, 26,  5, 18, 31, 10,
 	 2,  8, 24, 14, 32, 27,  3,  9, 19, 13, 30,  6, 22, 11,  4, 25
 };
 
-static uint32_t bits32[32] =
+static const uint32_t bits32[32] =
 {
 	0x80000000, 0x40000000, 0x20000000, 0x10000000,
 	0x08000000, 0x04000000, 0x02000000, 0x01000000,
@@ -170,9 +166,9 @@ static uint32_t bits32[32] =
 	0x00000008, 0x00000004, 0x00000002, 0x00000001
 };
 
-static u_char	bits8[8] = { 0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01 };
+static const u_char	bits8[8] = { 0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01 };
 
-static unsigned char	ascii64[] =
+static const unsigned char	ascii64[] =
 	 "./0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 /*	  0000000000111111111122222222223333333333444444444455555555556666 */
 /*	  0123456789012345678901234567890123456789012345678901234567890123 */
@@ -216,9 +212,8 @@ _crypt_extended_init(void)
 {
 	int i, j, b, k, inbit, obit;
 	uint32_t *p, *il, *ir, *fl, *fr;
-	uint32_t *bits28, *bits24;
+	const uint32_t *bits28, *bits24;
 	u_char inv_key_perm[64];
-	u_char u_key_perm[56];
 	u_char inv_comp_perm[56];
 	u_char init_perm[64], final_perm[64];
 	u_char u_sbox[8][64];
@@ -260,7 +255,6 @@ _crypt_extended_init(void)
 	 * compression permutation.
 	 */
 	for (i = 0; i < 56; i++) {
-		u_key_perm[i] = key_perm[i] - 1;
 		inv_key_perm[key_perm[i] - 1] = i;
 		inv_comp_perm[i] = 255;
 	}
@@ -582,7 +576,7 @@ static int
 des_cipher(const char *in, char *out, uint32_t salt, int count,
 	struct php_crypt_extended_data *data)
 {
-	uint32_t	l_out, r_out, rawl, rawr;
+	uint32_t	l_out = 0, r_out = 0, rawl, rawr;
 	int	retval;
 
 	setup_salt(salt, data);
@@ -613,7 +607,7 @@ des_cipher(const char *in, char *out, uint32_t salt, int count,
 }
 
 char *
-_crypt_extended_r(const char *key, const char *setting,
+_crypt_extended_r(const unsigned char *key, const char *setting,
 	struct php_crypt_extended_data *data)
 {
 	int		i;
@@ -628,12 +622,12 @@ _crypt_extended_r(const char *key, const char *setting,
 	 * and padding with zeros.
 	 */
 	q = (u_char *) keybuf;
-	while (q - (u_char *) keybuf < sizeof(keybuf)) {
+	while ((size_t)(q - (u_char *) keybuf) < sizeof(keybuf)) {
 		*q++ = *key << 1;
 		if (*key)
 			key++;
 	}
-	if (des_setkey((u_char *) keybuf, data))
+	if (des_setkey((char *) keybuf, data))
 		return(NULL);
 
 	if (*setting == _PASSWORD_EFMT1) {
@@ -662,17 +656,17 @@ _crypt_extended_r(const char *key, const char *setting,
 			/*
 			 * Encrypt the key with itself.
 			 */
-			if (des_cipher((u_char *) keybuf, (u_char *) keybuf,
+			if (des_cipher((char *) keybuf, (char *) keybuf,
 			    0, 1, data))
 				return(NULL);
 			/*
 			 * And XOR with the next 8 characters of the key.
 			 */
 			q = (u_char *) keybuf;
-			while (q - (u_char *) keybuf < sizeof(keybuf) && *key)
+			while ((size_t)(q - (u_char *) keybuf) < sizeof(keybuf) && *key)
 				*q++ ^= *key++ << 1;
 
-			if (des_setkey((u_char *) keybuf, data))
+			if (des_setkey((char *) keybuf, data))
 				return(NULL);
 		}
 		memcpy(data->output, setting, 9);
@@ -743,9 +737,9 @@ _crypt_extended(const char *key, const char *setting)
 
 #define crypt _crypt_extended
 
-static struct {
-	char *hash;
-	char *pw;
+static const struct {
+	const char *hash;
+	const char *pw;
 } tests[] = {
 /* "new"-style */
 	{"_J9..CCCCXBrJUJV154M", "U*U*U*U*"},

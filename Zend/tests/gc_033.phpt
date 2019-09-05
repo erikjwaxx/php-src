@@ -1,7 +1,7 @@
 --TEST--
 GC 033: Crash in GC while run with phpspec
---XFAIL--
-Full GC root buffer not handled correctly yet
+--INI--
+zend.enable_gc = 1
 --FILE--
 <?php
 $a = new stdClass();
@@ -27,4 +27,4 @@ for ($i=0; $i<9999; $i++) {
 var_dump(gc_collect_cycles());
 ?>
 --EXPECT--
-int(20001)
+int(10002)

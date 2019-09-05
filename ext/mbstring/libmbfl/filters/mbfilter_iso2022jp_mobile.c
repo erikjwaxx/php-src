@@ -48,9 +48,11 @@ const mbfl_encoding mbfl_encoding_2022jp_kddi = {
 	mbfl_no_encoding_2022jp_kddi,
 	"ISO-2022-JP-MOBILE#KDDI",
 	"ISO-2022-JP",
-	mbfl_encoding_2022jp_kddi_aliases,
+	&mbfl_encoding_2022jp_kddi_aliases,
 	NULL,
-	MBFL_ENCTYPE_MBCS | MBFL_ENCTYPE_SHFTCODE | MBFL_ENCTYPE_GL_UNSAFE
+	MBFL_ENCTYPE_MBCS | MBFL_ENCTYPE_SHFTCODE | MBFL_ENCTYPE_GL_UNSAFE,
+	&vtbl_2022jp_kddi_wchar,
+	&vtbl_wchar_2022jp_kddi
 };
 
 const struct mbfl_identify_vtbl vtbl_identify_2022jp_kddi = {
@@ -424,9 +426,7 @@ mbfl_filt_conv_wchar_2022jp_mobile(int c, mbfl_convert_filter *filter)
 			CK((*filter->output_function)(s1 & 0x7f, filter->data));
 		}
 	} else {
-		if (filter->illegal_mode != MBFL_OUTPUTFILTER_ILLEGAL_MODE_NONE) {
-			CK(mbfl_filt_conv_illegal_output(c, filter));
-		}
+		CK(mbfl_filt_conv_illegal_output(c, filter));
 	}
 
 	return c;

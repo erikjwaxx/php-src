@@ -21,6 +21,14 @@ if ($f = fopen("/proc/meminfo","r")) {
 if (empty($enough_free_ram)) {
 	die("skip need +3G free RAM");
 }
+
+if (getenv('TRAVIS')) {
+    die("skip Fails intermittently on travis");
+}
+
+if (getenv('SKIP_PERF_SENSITIVE')) {
+    die("skip Test may be very slow if PHP is instrumented");
+}
 ?>
 --FILE--
 <?php
@@ -29,8 +37,8 @@ echo "Test\n";
 
 include "php_cli_server.inc";
 
-php_cli_server_start("var_dump(\$_FILES);", false,
-	"-d post_max_size=3G -d upload_max_filesize=3G");
+php_cli_server_start("var_dump(\$_FILES);", null,
+	["-d", "post_max_size=3G", "-d", "upload_max_filesize=3G"]);
 
 list($host, $port) = explode(':', PHP_CLI_SERVER_ADDRESS);
 $port = intval($port)?:80;
@@ -74,9 +82,9 @@ fclose($fp);
 Done
 --EXPECTF--
 Test
-
 HTTP/1.1 200 OK
 Host: %s
+Date: %s
 Connection: close
 X-Powered-By: PHP/%s
 Content-type: text/html; charset=UTF-8

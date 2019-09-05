@@ -3,20 +3,19 @@ PDO PgSQL Bug #38671 (PDO#getAttribute() cannot be called with platform-specific
 --SKIPIF--
 <?php
 if (!extension_loaded('pdo') || !extension_loaded('pdo_pgsql')) die('skip not loaded');
-require dirname(__FILE__) . '/config.inc';
-require dirname(__FILE__) . '/../../../ext/pdo/tests/pdo_test.inc';
+require __DIR__ . '/config.inc';
+require __DIR__ . '/../../../ext/pdo/tests/pdo_test.inc';
 PDOTest::skip();
 ?>
 --FILE--
 <?php
 
-require dirname(__FILE__) . '/../../../ext/pdo/tests/pdo_test.inc';
-$pdo = PDOTest::test_factory(dirname(__FILE__) . '/common.phpt');
+require __DIR__ . '/../../../ext/pdo/tests/pdo_test.inc';
+$pdo = PDOTest::test_factory(__DIR__ . '/common.phpt');
 $pdo->setAttribute (\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
 
 $attrs = array(
     // Extensive test: default value and set+get values
-	PDO::PGSQL_ATTR_DISABLE_NATIVE_PREPARED_STATEMENT => array(null, true, false),
 	PDO::ATTR_EMULATE_PREPARES			=> array(null, true, false),
 	PDO::PGSQL_ATTR_DISABLE_PREPARES	=> array(null, true, false),
 
@@ -68,18 +67,6 @@ foreach ($attrs as $a => $vals) {
 
 ?>
 --EXPECTF--
-Deprecated: PDO::getAttribute(): %s
-bool(false)
-
-Deprecated: PDO::setAttribute(): %s
-
-Deprecated: PDO::getAttribute(): %s
-OK
-
-Deprecated: PDO::setAttribute(): %s
-
-Deprecated: PDO::getAttribute(): %s
-OK
 bool(false)
 OK
 OK
@@ -109,4 +96,3 @@ string(5) "pgsql"
 ERR
 ERR
 int(4)
-

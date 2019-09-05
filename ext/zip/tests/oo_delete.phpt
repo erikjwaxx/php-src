@@ -2,13 +2,12 @@
 Delete entries
 --SKIPIF--
 <?php
-/* $Id$ */
 if(!extension_loaded('zip')) die('skip');
 ?>
 --FILE--
 <?php
-$dirname = dirname(__FILE__) . '/';
-$file = $dirname . '__tmp_oo_delete.zip';
+$dirname = __DIR__ . '/';
+$file = $dirname . 'oo_delete.zip';
 if (file_exists($file)) {
 	unlink($file);
 }
@@ -63,14 +62,15 @@ $sb = $zip->statIndex(1);
 var_dump($sb);
 $sb = $zip->statIndex(2);
 var_dump($sb);
-$zip->close();
+// suppress irrelevant error message:
+@$zip->close();
 unset($zip);
 
 if (file_exists($file)) {
 	unlink($file);
 }
 ?>
---EXPECTF--
+--EXPECT--
 ok
 ok
 ok

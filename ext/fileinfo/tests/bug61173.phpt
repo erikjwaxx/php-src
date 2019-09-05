@@ -7,8 +7,11 @@ if (!class_exists('finfo'))
 --FILE--
 <?php
 
-$finfo = new finfo(1, '', false);
-var_dump($finfo);
---EXPECTF--
-Warning: finfo::finfo() expects at most 2 parameters, 3 given in %s on line %d
-NULL
+try {
+    $finfo = new finfo(1, '', false);
+    var_dump($finfo);
+} catch (TypeError $e) {
+    echo $e->getMessage(), "\n";
+}
+--EXPECT--
+finfo::__construct() expects at most 2 parameters, 3 given

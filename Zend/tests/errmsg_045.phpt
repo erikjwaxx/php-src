@@ -8,11 +8,13 @@ set_error_handler(function($_, $msg, $file) {
 	echo $undefined;
 });
 
-eval('class A { function a() {} function __construct() {} }');
+/* This is just a particular example of a non-fatal compile-time error
+ * If this breaks in future, just find another example and use it instead */
+eval('class A { private function __invoke() { } }');
 
 ?>
 --EXPECTF--
-string(50) "Redefining already defined constructor for class A"
+string(76) "The magic method __invoke() must have public visibility and cannot be static"
 string(%d) "%s(%d) : eval()'d code"
 
 Notice: Undefined variable: undefined in %s on line %d

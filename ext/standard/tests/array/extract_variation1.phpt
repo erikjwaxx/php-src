@@ -1,5 +1,5 @@
 --TEST--
-Test extract() function (variation 1) 
+Test extract() function (variation 1)
 --FILE--
 <?php
 
@@ -16,12 +16,11 @@ debug_zval_dump($str);
 
 echo "\nDone";
 ?>
-
 --EXPECTF--
-long(4)
+int(4)
 string(4) "John" refcount(%d)
 int(%d)
-long(4)
+int(4)
 string(4) "John" refcount(%d)
 
 Done

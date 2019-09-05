@@ -14,7 +14,8 @@ Foo::get();
 
 echo "Done\n";
 ?>
---EXPECTF--	
-Strict Standards: Non-static method Foo::get() should not be called statically in %s on line %d
-
-Fatal error: Non-static method Foo::__construct() cannot be called statically in %s on line %d
+--EXPECTF--
+Fatal error: Uncaught Error: Non-static method Foo::get() cannot be called statically in %s:%d
+Stack trace:
+#0 {main}
+  thrown in %s on line %d

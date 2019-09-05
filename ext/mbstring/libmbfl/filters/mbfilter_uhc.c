@@ -65,7 +65,9 @@ const mbfl_encoding mbfl_encoding_uhc = {
 	"UHC",
 	(const char *(*)[])&mbfl_encoding_uhc_aliases,
 	mblen_table_uhc,
-	MBFL_ENCTYPE_MBCS
+	MBFL_ENCTYPE_MBCS,
+	&vtbl_uhc_wchar,
+	&vtbl_wchar_uhc
 };
 
 const struct mbfl_identify_vtbl vtbl_identify_uhc = {
@@ -216,9 +218,7 @@ mbfl_filt_conv_wchar_uhc(int c, mbfl_convert_filter *filter)
 			CK((*filter->output_function)(s & 0xff, filter->data));
 		}
 	} else {
-		if (filter->illegal_mode != MBFL_OUTPUTFILTER_ILLEGAL_MODE_NONE) {
-			CK(mbfl_filt_conv_illegal_output(c, filter));
-		}
+		CK(mbfl_filt_conv_illegal_output(c, filter));
 	}
 
 	return c;
@@ -263,5 +263,3 @@ static int mbfl_filt_ident_uhc(int c, mbfl_identify_filter *filter)
 
 	return c;
 }
-
-

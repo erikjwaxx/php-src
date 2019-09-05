@@ -2,7 +2,7 @@
   +----------------------------------------------------------------------+
   | PHP Version 7                                                        |
   +----------------------------------------------------------------------+
-  | Copyright (c) 1997-2015 The PHP Group                                |
+  | Copyright (c) The PHP Group                                          |
   +----------------------------------------------------------------------+
   | This source file is subject to version 3.01 of the PHP license,      |
   | that is bundled with this package in the file LICENSE, and is        |
@@ -16,8 +16,6 @@
   |         Johannes Schlueter <johannes@mysql.com>                      |
   +----------------------------------------------------------------------+
 */
-
-/* $Id$ */
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -33,7 +31,7 @@
 
 #ifdef COMPILE_DL_PDO_MYSQL
 #ifdef ZTS
-ZEND_TSRMLS_CACHE_DEFINE();
+ZEND_TSRMLS_CACHE_DEFINE()
 #endif
 ZEND_GET_MODULE(pdo_mysql)
 #endif
@@ -82,7 +80,7 @@ static MYSQLND * pdo_mysql_convert_zv_to_mysqlnd(zval * zv)
 	return NULL;
 }
 
-static MYSQLND_REVERSE_API pdo_mysql_reverse_api = {
+static const MYSQLND_REVERSE_API pdo_mysql_reverse_api = {
 	&pdo_mysql_module_entry,
 	pdo_mysql_convert_zv_to_mysqlnd
 };
@@ -130,6 +128,9 @@ static PHP_MINIT_FUNCTION(pdo_mysql)
 	 REGISTER_PDO_CLASS_CONST_LONG("MYSQL_ATTR_SERVER_PUBLIC_KEY", (zend_long)PDO_MYSQL_ATTR_SERVER_PUBLIC_KEY);
 #endif
 	REGISTER_PDO_CLASS_CONST_LONG("MYSQL_ATTR_MULTI_STATEMENTS", (zend_long)PDO_MYSQL_ATTR_MULTI_STATEMENTS);
+#ifdef PDO_USE_MYSQLND
+	REGISTER_PDO_CLASS_CONST_LONG("MYSQL_ATTR_SSL_VERIFY_SERVER_CERT", (zend_long)PDO_MYSQL_ATTR_SSL_VERIFY_SERVER_CERT);
+#endif
 
 #ifdef PDO_USE_MYSQLND
 	mysqlnd_reverse_api_register_api(&pdo_mysql_reverse_api);
@@ -223,13 +224,12 @@ ZEND_TSRMLS_CACHE_UPDATE();
 /* }}} */
 
 /* {{{ pdo_mysql_functions[] */
-const zend_function_entry pdo_mysql_functions[] = {
+static const zend_function_entry pdo_mysql_functions[] = {
 	PHP_FE_END
 };
 /* }}} */
 
 /* {{{ pdo_mysql_deps[] */
-#if ZEND_MODULE_API_NO >= 20050922
 static const zend_module_dep pdo_mysql_deps[] = {
 	ZEND_MOD_REQUIRED("pdo")
 #ifdef PDO_USE_MYSQLND
@@ -237,7 +237,6 @@ static const zend_module_dep pdo_mysql_deps[] = {
 #endif
 	ZEND_MOD_END
 };
-#endif
 /* }}} */
 
 /* {{{ pdo_mysql_module_entry */
@@ -256,7 +255,7 @@ zend_module_entry pdo_mysql_module_entry = {
 	NULL,
 #endif
 	PHP_MINFO(pdo_mysql),
-	"1.0.2",
+	PHP_PDO_MYSQL_VERSION,
 	PHP_MODULE_GLOBALS(pdo_mysql),
 	PHP_GINIT(pdo_mysql),
 	NULL,
@@ -264,13 +263,3 @@ zend_module_entry pdo_mysql_module_entry = {
 	STANDARD_MODULE_PROPERTIES_EX
 };
 /* }}} */
-
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: noet sw=4 ts=4 fdm=marker
- * vim<600: noet sw=4 ts=4
- */

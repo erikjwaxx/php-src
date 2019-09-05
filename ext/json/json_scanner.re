@@ -1,8 +1,8 @@
 /*
   +----------------------------------------------------------------------+
-  | PHP Version 5                                                        |
+  | PHP Version 7                                                        |
   +----------------------------------------------------------------------+
-  | Copyright (c) 1997-2015 The PHP Group                                |
+  | Copyright (c) The PHP Group                                          |
   +----------------------------------------------------------------------+
   | This source file is subject to version 3.01 of the PHP license,      |
   | that is bundled with this package in the file LICENSE, and is        |
@@ -35,6 +35,18 @@
 
 #define PHP_JSON_CONDITION_SET(condition) YYSETCONDITION(yyc##condition)
 #define PHP_JSON_CONDITION_GOTO(condition) goto yyc_##condition
+#define PHP_JSON_CONDITION_SET_AND_GOTO(condition) \
+	PHP_JSON_CONDITION_SET(condition); \
+	PHP_JSON_CONDITION_GOTO(condition)
+#define PHP_JSON_CONDITION_GOTO_STR_P2() \
+	do { \
+		if (s->utf8_invalid) { \
+			PHP_JSON_CONDITION_GOTO(STR_P2_BIN); \
+		} else { \
+			PHP_JSON_CONDITION_GOTO(STR_P2_UTF); \
+		} \
+	} while(0)
+
 
 #define PHP_JSON_SCANNER_COPY_ESC() php_json_scanner_copy_string(s, 0)
 #define PHP_JSON_SCANNER_COPY_UTF() php_json_scanner_copy_string(s, 5)
@@ -92,7 +104,7 @@ void php_json_scanner_init(php_json_scanner *s, char *str, size_t str_len, int o
 int php_json_scan(php_json_scanner *s)
 {
 	ZVAL_NULL(&s->value);
-	
+
 std:
 	s->token = s->cursor;
 
@@ -138,7 +150,7 @@ std:
 	UTF16_2 = UTFPREF "0" HEX7 HEX{2} ;
 	UTF16_3 = UTFPREF ( ( ( HEXC | [efEF] ) HEX ) | ( [dD] HEX7 ) ) HEX{2} ;
 	UTF16_4 = UTFPREF [dD] [89abAB] HEX{2} UTFPREF [dD] [c-fC-F] HEX{2} ;
-	
+
 	<JS>"{"                  { return '{'; }
 	<JS>"}"                  { return '}'; }
 	<JS>"["                  { return '['; }
@@ -190,15 +202,28 @@ std:
 		if (s->limit < s->cursor) {
 			return PHP_JSON_T_EOI;
 		} else {
-			s->errcode = PHP_JSON_ERROR_SYNTAX;
+			s->errcode = PHP_JSON_ERROR_CTRL_CHAR;
 			return PHP_JSON_T_ERROR;
 		}
 	}
 	<JS>["]                  {
 		s->str_start = s->cursor;
 		s->str_esc = 0;
-		PHP_JSON_CONDITION_SET(STR_P1);
-		PHP_JSON_CONDITION_GOTO(STR_P1);
+		s->utf8_invalid = 0;
+		s->utf8_invalid_count = 0;
+		PHP_JSON_CONDITION_SET_AND_GOTO(STR_P1);
+	}
+	<JS>CTRL                 {
+		s->errcode = PHP_JSON_ERROR_CTRL_CHAR;
+		return PHP_JSON_T_ERROR;
+	}
+	<JS>UTF8                 {
+		s->errcode = PHP_JSON_ERROR_SYNTAX;
+		return PHP_JSON_T_ERROR;
+	}
+	<JS>ANY                  {
+		s->errcode = PHP_JSON_ERROR_UTF8;
+		return PHP_JSON_T_ERROR;
 	}
 
 	<STR_P1>CTRL             {
@@ -213,13 +238,17 @@ std:
 		s->str_esc += 4;
 		PHP_JSON_CONDITION_GOTO(STR_P1);
 	}
+	<STR_P1>UTF16_3          {
+		s->str_esc += 3;
+		PHP_JSON_CONDITION_GOTO(STR_P1);
+	}
 	<STR_P1>UTF16_4          {
 		s->str_esc += 8;
 		PHP_JSON_CONDITION_GOTO(STR_P1);
 	}
 	<STR_P1>UCS2             {
-		s->str_esc += 3;
-		PHP_JSON_CONDITION_GOTO(STR_P1);
+		s->errcode = PHP_JSON_ERROR_UTF16;
+		return PHP_JSON_T_ERROR;
 	}
 	<STR_P1>ESC              {
 		s->str_esc++;
@@ -231,20 +260,19 @@ std:
 	}
 	<STR_P1>["]              {
 		zend_string *str;
-		size_t len = s->cursor - s->str_start - s->str_esc - 1;
+		size_t len = s->cursor - s->str_start - s->str_esc - 1 + s->utf8_invalid_count;
 		if (len == 0) {
 			PHP_JSON_CONDITION_SET(JS);
 			ZVAL_EMPTY_STRING(&s->value);
 			return PHP_JSON_T_ESTRING;
 		}
 		str = zend_string_alloc(len, 0);
-		str->val[len] = '\0';
+		ZSTR_VAL(str)[len] = '\0';
 		ZVAL_STR(&s->value, str);
-		if (s->str_esc) {
+		if (s->str_esc || s->utf8_invalid) {
 			s->pstr = (php_json_ctype *) Z_STRVAL(s->value);
 			s->cursor = s->str_start;
-			PHP_JSON_CONDITION_SET(STR_P2);
-			PHP_JSON_CONDITION_GOTO(STR_P2);
+			PHP_JSON_CONDITION_GOTO_STR_P2();
 		} else {
 			memcpy(Z_STRVAL(s->value), s->str_start, len);
 			PHP_JSON_CONDITION_SET(JS);
@@ -253,26 +281,48 @@ std:
 	}
 	<STR_P1>UTF8             { PHP_JSON_CONDITION_GOTO(STR_P1); }
 	<STR_P1>ANY              {
+		if (s->options & (PHP_JSON_INVALID_UTF8_IGNORE | PHP_JSON_INVALID_UTF8_SUBSTITUTE)) {
+			if (s->options & PHP_JSON_INVALID_UTF8_SUBSTITUTE) {
+				if (s->utf8_invalid_count > INT_MAX - 2) {
+					s->errcode = PHP_JSON_ERROR_UTF8;
+					return PHP_JSON_T_ERROR;
+				}
+				s->utf8_invalid_count += 2;
+			} else {
+				s->utf8_invalid_count--;
+			}
+			s->utf8_invalid = 1;
+			PHP_JSON_CONDITION_GOTO(STR_P1);
+		}
 		s->errcode = PHP_JSON_ERROR_UTF8;
 		return PHP_JSON_T_ERROR;
 	}
 
-	<STR_P2>UTF16_1             {
+	<STR_P2_UTF,STR_P2_BIN>UTF16_1             {
 		int utf16 = php_json_ucs2_to_int(s, 2);
 		PHP_JSON_SCANNER_COPY_UTF();
 		*(s->pstr++) = (char) utf16;
 		s->str_start = s->cursor;
-		PHP_JSON_CONDITION_GOTO(STR_P2);
+		PHP_JSON_CONDITION_GOTO_STR_P2();
 	}
-	<STR_P2>UTF16_2             {
+	<STR_P2_UTF,STR_P2_BIN>UTF16_2             {
 		int utf16 = php_json_ucs2_to_int(s, 3);
 		PHP_JSON_SCANNER_COPY_UTF();
 		*(s->pstr++) = (char) (0xc0 | (utf16 >> 6));
 		*(s->pstr++) = (char) (0x80 | (utf16 & 0x3f));
 		s->str_start = s->cursor;
-		PHP_JSON_CONDITION_GOTO(STR_P2);
+		PHP_JSON_CONDITION_GOTO_STR_P2();
 	}
-	<STR_P2>UTF16_4             {
+	<STR_P2_UTF,STR_P2_BIN>UTF16_3             {
+		int utf16 = php_json_ucs2_to_int(s, 4);
+		PHP_JSON_SCANNER_COPY_UTF();
+		*(s->pstr++) = (char) (0xe0 | (utf16 >> 12));
+		*(s->pstr++) = (char) (0x80 | ((utf16 >> 6) & 0x3f));
+		*(s->pstr++) = (char) (0x80 | (utf16 & 0x3f));
+		s->str_start = s->cursor;
+		PHP_JSON_CONDITION_GOTO_STR_P2();
+	}
+	<STR_P2_UTF,STR_P2_BIN>UTF16_4             {
 		int utf32, utf16_hi, utf16_lo;
 		utf16_hi = php_json_ucs2_to_int(s, 4);
 		utf16_lo = php_json_ucs2_to_int_ex(s, 4, 7);
@@ -283,18 +333,9 @@ std:
 		*(s->pstr++) = (char) (0x80 | ((utf32 >> 6) & 0x3f));
 		*(s->pstr++) = (char) (0x80 | (utf32 & 0x3f));
 		s->str_start = s->cursor;
-		PHP_JSON_CONDITION_GOTO(STR_P2);
+		PHP_JSON_CONDITION_GOTO_STR_P2();
 	}
-	<STR_P2>UCS2             {
-		int utf16 = php_json_ucs2_to_int(s, 4);
-		PHP_JSON_SCANNER_COPY_UTF();
-		*(s->pstr++) = (char) (0xe0 | (utf16 >> 12));
-		*(s->pstr++) = (char) (0x80 | ((utf16 >> 6) & 0x3f));
-		*(s->pstr++) = (char) (0x80 | (utf16 & 0x3f));
-		s->str_start = s->cursor;
-		PHP_JSON_CONDITION_GOTO(STR_P2);
-	}
-	<STR_P2>ESCPREF          {
+	<STR_P2_UTF,STR_P2_BIN>ESCPREF          {
 		char esc;
 		PHP_JSON_SCANNER_COPY_ESC();
 		switch (*s->cursor) {
@@ -302,8 +343,7 @@ std:
 				esc = '\b';
 				break;
 			case 'f':
-				esc = '\f';
-				break;
+				esc = '\f';				break;
 			case 'n':
 				esc = '\n';
 				break;
@@ -325,13 +365,26 @@ std:
 		*(s->pstr++) = esc;
 		++YYCURSOR;
 		s->str_start = s->cursor;
-		PHP_JSON_CONDITION_GOTO(STR_P2);
+		PHP_JSON_CONDITION_GOTO_STR_P2();
 	}
-	<STR_P2>["] => JS        {
+	<STR_P2_UTF,STR_P2_BIN>["] => JS        {
 		PHP_JSON_SCANNER_COPY_ESC();
 		return PHP_JSON_T_STRING;
 	}
-	<STR_P2>ANY              { PHP_JSON_CONDITION_GOTO(STR_P2); }
+	<STR_P2_BIN>UTF8         { PHP_JSON_CONDITION_GOTO(STR_P2_BIN); }
+	<STR_P2_BIN>ANY          {
+		if (s->utf8_invalid) {
+			PHP_JSON_SCANNER_COPY_ESC();
+			if (s->options & PHP_JSON_INVALID_UTF8_SUBSTITUTE) {
+				*(s->pstr++) = (char) (0xe0 | (0xfffd >> 12));
+				*(s->pstr++) = (char) (0x80 | ((0xfffd >> 6) & 0x3f));
+				*(s->pstr++) = (char) (0x80 | (0xfffd & 0x3f));
+			}
+			s->str_start = s->cursor;
+		}
+		PHP_JSON_CONDITION_GOTO(STR_P2_BIN);
+	}
+	<STR_P2_UTF>ANY          { PHP_JSON_CONDITION_GOTO(STR_P2_UTF); }
 
 	<*>ANY                   {
 		s->errcode = PHP_JSON_ERROR_SYNTAX;
@@ -340,4 +393,3 @@ std:
 */
 
 }
-

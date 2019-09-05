@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | PHP Version 7                                                        |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1997-2015 The PHP Group                                |
+   | Copyright (c) The PHP Group                                          |
    +----------------------------------------------------------------------+
    | This source file is subject to version 3.01 of the PHP license,      |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -16,8 +16,6 @@
    +----------------------------------------------------------------------+
  */
 
-/* $Id$ */
-
 #include <math.h>				/* modf() */
 #include "php.h"
 #include "ext/standard/head.h"
@@ -25,16 +23,12 @@
 #include "zend_execute.h"
 #include <stdio.h>
 
-#ifdef HAVE_LOCALE_H
 #include <locale.h>
 #ifdef ZTS
 #include "ext/standard/php_string.h"
 #define LCONV_DECIMAL_POINT (*lconv.decimal_point)
 #else
 #define LCONV_DECIMAL_POINT (*lconv->decimal_point)
-#endif
-#else
-#define LCONV_DECIMAL_POINT '.'
 #endif
 
 #define ALIGN_LEFT 0
@@ -52,19 +46,38 @@
 # define PRINTF_DEBUG(arg)
 #endif
 
-static char hexchars[] = "0123456789abcdef";
-static char HEXCHARS[] = "0123456789ABCDEF";
+static const char hexchars[] = "0123456789abcdef";
+static const char HEXCHARS[] = "0123456789ABCDEF";
 
 /* php_spintf_appendchar() {{{ */
 inline static void
 php_sprintf_appendchar(zend_string **buffer, size_t *pos, char add)
 {
-	if (!*buffer || (*pos + 1) >= (*buffer)->len) {
-		PRINTF_DEBUG(("%s(): ereallocing buffer to %d bytes\n", get_active_function_name(), (*buffer)->len));
-		*buffer = zend_string_realloc(*buffer, (*buffer)->len << 1, 0);
+	if ((*pos + 1) >= ZSTR_LEN(*buffer)) {
+		PRINTF_DEBUG(("%s(): ereallocing buffer to %d bytes\n", get_active_function_name(), ZSTR_LEN(*buffer)));
+		*buffer = zend_string_extend(*buffer, ZSTR_LEN(*buffer) << 1, 0);
 	}
 	PRINTF_DEBUG(("sprintf: appending '%c', pos=\n", add, *pos));
-	(*buffer)->val[(*pos)++] = add;
+	ZSTR_VAL(*buffer)[(*pos)++] = add;
+}
+/* }}} */
+
+/* php_spintf_appendchar() {{{ */
+inline static void
+php_sprintf_appendchars(zend_string **buffer, size_t *pos, char *add, size_t len)
+{
+	if ((*pos + len) >= ZSTR_LEN(*buffer)) {
+		size_t nlen = ZSTR_LEN(*buffer);
+
+		PRINTF_DEBUG(("%s(): ereallocing buffer to %d bytes\n", get_active_function_name(), ZSTR_LEN(*buffer)));
+		do {
+			nlen = nlen << 1;
+		} while ((*pos + len) >= nlen);
+		*buffer = zend_string_extend(*buffer, nlen, 0);
+	}
+	PRINTF_DEBUG(("sprintf: appending \"%s\", pos=\n", add, *pos));
+	memcpy(ZSTR_VAL(*buffer) + (*pos), add, len);
+	*pos += len;
 }
 /* }}} */
 
@@ -83,17 +96,17 @@ php_sprintf_appendstring(zend_string **buffer, size_t *pos, char *add,
 	npad = (min_width < copy_len) ? 0 : min_width - copy_len;
 
 	PRINTF_DEBUG(("sprintf: appendstring(%x, %d, %d, \"%s\", %d, '%c', %d)\n",
-				  *buffer, *pos, (*buffer)->len, add, min_width, padding, alignment));
+				  *buffer, *pos, ZSTR_LEN(*buffer), add, min_width, padding, alignment));
 	m_width = MAX(min_width, copy_len);
 
 	if(m_width > INT_MAX - *pos - 1) {
-		zend_error_noreturn(E_ERROR, "Field width %d is too long", m_width);
+		zend_error_noreturn(E_ERROR, "Field width %zd is too long", m_width);
 	}
 
 	req_size = *pos + m_width + 1;
 
-	if (!*buffer || req_size > (*buffer)->len) {
-		size_t size = (*buffer)->len;
+	if (req_size > ZSTR_LEN(*buffer)) {
+		size_t size = ZSTR_LEN(*buffer);
 		while (req_size > size) {
 			if (size > ZEND_SIZE_MAX/2) {
 				zend_error_noreturn(E_ERROR, "Field width %zd is too long", req_size);
@@ -101,25 +114,25 @@ php_sprintf_appendstring(zend_string **buffer, size_t *pos, char *add,
 			size <<= 1;
 		}
 		PRINTF_DEBUG(("sprintf ereallocing buffer to %d bytes\n", size));
-		*buffer = zend_string_realloc(*buffer, size, 0);
+		*buffer = zend_string_extend(*buffer, size, 0);
 	}
 	if (alignment == ALIGN_RIGHT) {
 		if ((neg || always_sign) && padding=='0') {
-			(*buffer)->val[(*pos)++] = (neg) ? '-' : '+';
+			ZSTR_VAL(*buffer)[(*pos)++] = (neg) ? '-' : '+';
 			add++;
 			len--;
 			copy_len--;
 		}
 		while (npad-- > 0) {
-			(*buffer)->val[(*pos)++] = padding;
+			ZSTR_VAL(*buffer)[(*pos)++] = padding;
 		}
 	}
 	PRINTF_DEBUG(("sprintf: appending \"%s\"\n", add));
-	memcpy(&(*buffer)->val[*pos], add, copy_len + 1);
+	memcpy(&ZSTR_VAL(*buffer)[*pos], add, copy_len + 1);
 	*pos += copy_len;
 	if (alignment == ALIGN_LEFT) {
 		while (npad--) {
-			(*buffer)->val[(*pos)++] = padding;
+			ZSTR_VAL(*buffer)[(*pos)++] = padding;
 		}
 	}
 }
@@ -136,7 +149,7 @@ php_sprintf_appendint(zend_string **buffer, size_t *pos, zend_long number,
 	register unsigned int i = NUM_BUF_SIZE - 1, neg = 0;
 
 	PRINTF_DEBUG(("sprintf: appendint(%x, %x, %x, %d, %d, '%c', %d)\n",
-				  *buffer, pos, &(*buffer)->len, number, width, padding, alignment));
+				  *buffer, pos, &ZSTR_LEN(*buffer), number, width, padding, alignment));
 	if (number < 0) {
 		neg = 1;
 		magn = ((zend_ulong) -(number + 1)) + 1;
@@ -180,7 +193,7 @@ php_sprintf_appenduint(zend_string **buffer, size_t *pos,
 	register unsigned int i = NUM_BUF_SIZE - 1;
 
 	PRINTF_DEBUG(("sprintf: appenduint(%x, %x, %x, %d, %d, '%c', %d)\n",
-				  *buffer, pos, &(*buffer)->len, number, width, padding, alignment));
+				  *buffer, pos, &ZSTR_LEN(*buffer), number, width, padding, alignment));
 	magn = (zend_ulong) number;
 
 	/* Can't right-pad 0's on integers */
@@ -215,16 +228,14 @@ php_sprintf_appenddouble(zend_string **buffer, size_t *pos,
 	char *s = NULL;
 	size_t s_len = 0;
 	int is_negative = 0;
-#ifdef HAVE_LOCALE_H
 #ifdef ZTS
 	struct lconv lconv;
 #else
 	struct lconv *lconv;
 #endif
-#endif
 
 	PRINTF_DEBUG(("sprintf: appenddouble(%x, %x, %x, %f, %d, '%c', %d, %c)\n",
-				  *buffer, pos, &(*buffer)->len, number, width, padding, alignment, fmt));
+				  *buffer, pos, &ZSTR_LEN(*buffer), number, width, padding, alignment, fmt));
 	if ((adjust & ADJ_PRECISION) == 0) {
 		precision = FLOAT_PRECISION;
 	} else if (precision > MAX_FLOAT_PRECISION) {
@@ -251,12 +262,10 @@ php_sprintf_appenddouble(zend_string **buffer, size_t *pos,
 		case 'E':
 		case 'f':
 		case 'F':
-#ifdef HAVE_LOCALE_H
 #ifdef ZTS
 			localeconv_r(&lconv);
 #else
 			lconv = localeconv();
-#endif
 #endif
 			s = php_conv_fp((fmt == 'f')?'F':fmt, number, 0, precision,
 						(fmt == 'f')?LCONV_DECIMAL_POINT:'.',
@@ -279,12 +288,10 @@ php_sprintf_appenddouble(zend_string **buffer, size_t *pos,
 			/*
 			 * * We use &num_buf[ 1 ], so that we have room for the sign
 			 */
-#ifdef HAVE_LOCALE_H
 #ifdef ZTS
 			localeconv_r(&lconv);
 #else
 			lconv = localeconv();
-#endif
 #endif
 			s = php_gcvt(number, precision, LCONV_DECIMAL_POINT, (fmt == 'G')?'E':'e', &num_buf[1]);
 			is_negative = 0;
@@ -309,7 +316,7 @@ php_sprintf_appenddouble(zend_string **buffer, size_t *pos,
 inline static void
 php_sprintf_append2n(zend_string **buffer, size_t *pos, zend_long number,
 					 size_t width, char padding, size_t alignment, int n,
-					 char *chartable, int expprec)
+					 const char *chartable, int expprec)
 {
 	char numbuf[NUM_BUF_SIZE];
 	register zend_ulong num;
@@ -317,7 +324,7 @@ php_sprintf_append2n(zend_string **buffer, size_t *pos, zend_long number,
 	register int andbits = (1 << n) - 1;
 
 	PRINTF_DEBUG(("sprintf: append2n(%x, %x, %x, %d, %d, '%c', %d, %d, %x)\n",
-				  *buffer, pos, &(*buffer)->len, number, width, padding, alignment, n,
+				  *buffer, pos, &ZSTR_LEN(*buffer), number, width, padding, alignment, n,
 				  chartable));
 	PRINTF_DEBUG(("sprintf: append2n 2^%d andbits=%x\n", n, andbits));
 
@@ -338,17 +345,18 @@ php_sprintf_append2n(zend_string **buffer, size_t *pos, zend_long number,
 
 /* php_spintf_getnumber() {{{ */
 inline static int
-php_sprintf_getnumber(char *buffer, size_t *pos)
+php_sprintf_getnumber(char **buffer, size_t *len)
 {
 	char *endptr;
-	register zend_long num = ZEND_STRTOL(&buffer[*pos], &endptr, 10);
-	register size_t i = 0;
+	register zend_long num = ZEND_STRTOL(*buffer, &endptr, 10);
+	register size_t i;
 
 	if (endptr != NULL) {
-		i = (endptr - &buffer[*pos]);
+		i = (endptr - *buffer);
+		*len -= i;
+		*buffer = endptr;
 	}
 	PRINTF_DEBUG(("sprintf_getnumber: number was %d bytes long\n", i));
-	*pos += i;
 
 	if (num >= INT_MAX || num < 0) {
 		return -1;
@@ -383,117 +391,93 @@ php_sprintf_getnumber(char *buffer, size_t *pos)
  *
  */
 static zend_string *
-php_formatted_print(int param_count, int use_array, int format_offset)
+php_formatted_print(zval *z_format, zval *args, int argc)
 {
-	zval *newargs = NULL;
-	zval *args, *z_format;
-	int argc;
-	size_t size = 240, inpos = 0, outpos = 0, temppos;
+	size_t size = 240, outpos = 0;
 	int alignment, currarg, adjusting, argnum, width, precision;
-	char *format, padding;
+	char *format, *temppos, padding;
 	zend_string *result;
 	int always_sign;
 	size_t format_len;
 
-	if (zend_parse_parameters(param_count, "+", &args, &argc) == FAILURE) {
+	if (!try_convert_to_string(z_format)) {
 		return NULL;
 	}
 
-	/* verify the number of args */
-	if ((use_array && argc != (2 + format_offset))
-			|| (!use_array && argc < (1 + format_offset))) {
-		WRONG_PARAM_COUNT_WITH_RETVAL(NULL);
-	}
-
-	convert_to_string_ex(&args[format_offset]);
-	if (use_array) {
-		int i = 1;
-		zval *zv;
-		zval *array;
-
-		z_format = &args[format_offset];
-		array = &args[1 + format_offset];
-		if (Z_TYPE_P(array) != IS_ARRAY) {
-			SEPARATE_ZVAL(array);
-			convert_to_array(array);
-		}
-
-		argc = 1 + zend_hash_num_elements(Z_ARRVAL_P(array));
-		newargs = (zval *)safe_emalloc(argc, sizeof(zval), 0);
-		ZVAL_COPY_VALUE(&newargs[0], z_format);
-
-		ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(array), zv) {
-			ZVAL_COPY_VALUE(&newargs[i], zv);
-			i++;
-		} ZEND_HASH_FOREACH_END();
-		args = newargs;
-		format_offset = 0;
-	}
-
-	format = Z_STRVAL(args[format_offset]);
-	format_len = Z_STRLEN(args[format_offset]);
+	format = Z_STRVAL_P(z_format);
+	format_len = Z_STRLEN_P(z_format);
 	result = zend_string_alloc(size, 0);
 
-	currarg = 1;
+	currarg = 0;
 
-	while (inpos < Z_STRLEN(args[format_offset])) {
-		int expprec = 0;
+	while (format_len) {
+		int expprec;
 		zval *tmp;
 
-		PRINTF_DEBUG(("sprintf: format[%d]='%c'\n", inpos, format[inpos]));
-		PRINTF_DEBUG(("sprintf: outpos=%d\n", outpos));
-		if (format[inpos] != '%') {
-			php_sprintf_appendchar(&result, &outpos, format[inpos++]);
-		} else if (format[inpos + 1] == '%') {
+		temppos = memchr(format, '%', format_len);
+		if (!temppos) {
+			php_sprintf_appendchars(&result, &outpos, format, format_len);
+			break;
+		} else if (temppos != format) {
+			php_sprintf_appendchars(&result, &outpos, format, temppos - format);
+			format_len -= temppos - format;
+			format = temppos;
+		}
+		format++;			/* skip the '%' */
+		format_len--;
+
+		if (*format == '%') {
 			php_sprintf_appendchar(&result, &outpos, '%');
-			inpos += 2;
+			format++;
+			format_len--;
 		} else {
 			/* starting a new format specifier, reset variables */
 			alignment = ALIGN_RIGHT;
 			adjusting = 0;
 			padding = ' ';
 			always_sign = 0;
-			inpos++;			/* skip the '%' */
+			expprec = 0;
 
 			PRINTF_DEBUG(("sprintf: first looking at '%c', inpos=%d\n",
-						  format[inpos], inpos));
-			if (isascii((int)format[inpos]) && !isalpha((int)format[inpos])) {
+						  *format, format - Z_STRVAL_P(z_format)));
+			if (isalpha((int)*format)) {
+				width = precision = 0;
+				argnum = currarg++;
+			} else {
 				/* first look for argnum */
-				temppos = inpos;
-				while (isdigit((int)format[temppos])) temppos++;
-				if (format[temppos] == '$') {
-					argnum = php_sprintf_getnumber(format, &inpos);
+				temppos = format;
+				while (isdigit((int)*temppos)) temppos++;
+				if (*temppos == '$') {
+					argnum = php_sprintf_getnumber(&format, &format_len);
 
 					if (argnum <= 0) {
-						efree(result);
-						if (newargs) {
-							efree(newargs);
-						}
+						zend_string_efree(result);
 						php_error_docref(NULL, E_WARNING, "Argument number must be greater than zero");
 						return NULL;
 					}
-
-					inpos++;  /* skip the '$' */
+					argnum--;
+					format++;  /* skip the '$' */
+					format_len--;
 				} else {
 					argnum = currarg++;
 				}
 
-				argnum += format_offset;
-
 				/* after argnum comes modifiers */
 				PRINTF_DEBUG(("sprintf: looking for modifiers\n"
 							  "sprintf: now looking at '%c', inpos=%d\n",
-							  format[inpos], inpos));
-				for (;; inpos++) {
-					if (format[inpos] == ' ' || format[inpos] == '0') {
-						padding = format[inpos];
-					} else if (format[inpos] == '-') {
+							  *format, format - Z_STRVAL_P(z_format)));
+				for (;; format++, format_len--) {
+					if (*format == ' ' || *format == '0') {
+						padding = *format;
+					} else if (*format == '-') {
 						alignment = ALIGN_LEFT;
 						/* space padding, the default */
-					} else if (format[inpos] == '+') {
+					} else if (*format == '+') {
 						always_sign = 1;
-					} else if (format[inpos] == '\'' && inpos+1<format_len) {
-						padding = format[++inpos];
+					} else if (*format == '\'' && format_len > 1) {
+						format++;
+						format_len--;
+						padding = *format;
 					} else {
 						PRINTF_DEBUG(("sprintf: end of modifiers\n"));
 						break;
@@ -505,17 +489,11 @@ php_formatted_print(int param_count, int use_array, int format_offset)
 
 
 				/* after modifiers comes width */
-				if (isdigit((int)format[inpos])) {
+				if (isdigit((int)*format)) {
 					PRINTF_DEBUG(("sprintf: getting width\n"));
-					if ((width = php_sprintf_getnumber(format, &inpos)) < 0) {
+					if ((width = php_sprintf_getnumber(&format, &format_len)) < 0) {
 						efree(result);
-						if (newargs) {
-							efree(newargs);
-						}
 						php_error_docref(NULL, E_WARNING, "Width must be greater than zero and less than %d", INT_MAX);
-						if (newargs) {
-							efree(newargs);
-						}
 						return NULL;
 					}
 					adjusting |= ADJ_WIDTH;
@@ -525,19 +503,14 @@ php_formatted_print(int param_count, int use_array, int format_offset)
 				PRINTF_DEBUG(("sprintf: width=%d\n", width));
 
 				/* after width and argnum comes precision */
-				if (format[inpos] == '.') {
-					inpos++;
+				if (*format == '.') {
+					format++;
+					format_len--;
 					PRINTF_DEBUG(("sprintf: getting precision\n"));
-					if (isdigit((int)format[inpos])) {
-						if ((precision = php_sprintf_getnumber(format, &inpos)) < 0) {
+					if (isdigit((int)*format)) {
+						if ((precision = php_sprintf_getnumber(&format, &format_len)) < 0) {
 							efree(result);
-							if (newargs) {
-								efree(newargs);
-							}
 							php_error_docref(NULL, E_WARNING, "Precision must be greater than zero and less than %d", INT_MAX);
-							if (newargs) {
-								efree(newargs);
-							}
 							return NULL;
 						}
 						adjusting |= ADJ_PRECISION;
@@ -549,36 +522,32 @@ php_formatted_print(int param_count, int use_array, int format_offset)
 					precision = 0;
 				}
 				PRINTF_DEBUG(("sprintf: precision=%d\n", precision));
-			} else {
-				width = precision = 0;
-				argnum = currarg++ + format_offset;
 			}
 
 			if (argnum >= argc) {
 				efree(result);
-				if (newargs) {
-					efree(newargs);
-				}
 				php_error_docref(NULL, E_WARNING, "Too few arguments");
 				return NULL;
 			}
 
-			if (format[inpos] == 'l') {
-				inpos++;
+			if (*format == 'l') {
+				format++;
+				format_len--;
 			}
-			PRINTF_DEBUG(("sprintf: format character='%c'\n", format[inpos]));
+			PRINTF_DEBUG(("sprintf: format character='%c'\n", *format));
 			/* now we expect to find a type specifier */
 			tmp = &args[argnum];
-			switch (format[inpos]) {
+			switch (*format) {
 				case 's': {
-					zend_string *str = zval_get_string(tmp);
+					zend_string *t;
+					zend_string *str = zval_get_tmp_string(tmp, &t);
 					php_sprintf_appendstring(&result, &outpos,
-											 str->val,
+											 ZSTR_VAL(str),
 											 width, precision, padding,
 											 alignment,
-											 str->len,
+											 ZSTR_LEN(str),
 											 0, expprec, 0);
-					zend_string_release(str);
+					zend_tmp_string_release(t);
 					break;
 				}
 
@@ -605,7 +574,7 @@ php_formatted_print(int param_count, int use_array, int format_offset)
 											 zval_get_double(tmp),
 											 width, padding, alignment,
 											 precision, adjusting,
-											 format[inpos], always_sign
+											 *format, always_sign
 											);
 					break;
 
@@ -646,145 +615,214 @@ php_formatted_print(int param_count, int use_array, int format_offset)
 					php_sprintf_appendchar(&result, &outpos, '%');
 
 					break;
+
+				case '\0':
+					if (!format_len) {
+						goto exit;
+					}
+					break;
+
 				default:
 					break;
 			}
-			inpos++;
+			format++;
+			format_len--;
 		}
 	}
 
-	if (newargs) {
-		efree(newargs);
-	}
-
+exit:
 	/* possibly, we have to make sure we have room for the terminating null? */
-	result->val[outpos]=0;
-	result->len = outpos;
+	ZSTR_VAL(result)[outpos]=0;
+	ZSTR_LEN(result) = outpos;
 	return result;
 }
 /* }}} */
 
-/* {{{ proto string sprintf(string format [, mixed arg1 [, mixed ...]])
+/* php_formatted_print_get_array() {{{ */
+static zval*
+php_formatted_print_get_array(zval *array, int *argc)
+{
+	zval *args, *zv;
+	int n;
+
+	if (Z_TYPE_P(array) != IS_ARRAY) {
+		convert_to_array(array);
+	}
+
+	n = zend_hash_num_elements(Z_ARRVAL_P(array));
+	args = (zval *)safe_emalloc(n, sizeof(zval), 0);
+	n = 0;
+	ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(array), zv) {
+		ZVAL_COPY_VALUE(&args[n], zv);
+		n++;
+	} ZEND_HASH_FOREACH_END();
+
+	*argc = n;
+	return args;
+}
+/* }}} */
+
+/* {{{ proto string|false sprintf(string format [, mixed arg1 [, mixed ...]])
    Return a formatted string */
 PHP_FUNCTION(user_sprintf)
 {
 	zend_string *result;
+	zval *format, *args;
+	int argc;
 
-	if ((result=php_formatted_print(ZEND_NUM_ARGS(), 0, 0))==NULL) {
+	ZEND_PARSE_PARAMETERS_START(1, -1)
+		Z_PARAM_ZVAL(format)
+		Z_PARAM_VARIADIC('*', args, argc)
+	ZEND_PARSE_PARAMETERS_END();
+
+	result = php_formatted_print(format, args, argc);
+	if (result == NULL) {
 		RETURN_FALSE;
 	}
 	RETVAL_STR(result);
 }
 /* }}} */
 
-/* {{{ proto string vsprintf(string format, array args)
+/* {{{ proto string|false vsprintf(string format, array args)
    Return a formatted string */
 PHP_FUNCTION(vsprintf)
 {
 	zend_string *result;
+	zval *format, *array, *args;
+	int argc;
 
-	if ((result=php_formatted_print(ZEND_NUM_ARGS(), 1, 0))==NULL) {
+	ZEND_PARSE_PARAMETERS_START(2, 2)
+		Z_PARAM_ZVAL(format)
+		Z_PARAM_ZVAL(array)
+	ZEND_PARSE_PARAMETERS_END();
+
+	args = php_formatted_print_get_array(array, &argc);
+
+	result = php_formatted_print(format, args, argc);
+	efree(args);
+	if (result == NULL) {
 		RETURN_FALSE;
 	}
 	RETVAL_STR(result);
 }
 /* }}} */
 
-/* {{{ proto int printf(string format [, mixed arg1 [, mixed ...]])
+/* {{{ proto int|false printf(string format [, mixed arg1 [, mixed ...]])
    Output a formatted string */
 PHP_FUNCTION(user_printf)
 {
 	zend_string *result;
 	size_t rlen;
+	zval *format, *args;
+	int argc;
 
-	if ((result=php_formatted_print(ZEND_NUM_ARGS(), 0, 0))==NULL) {
+	ZEND_PARSE_PARAMETERS_START(1, -1)
+		Z_PARAM_ZVAL(format)
+		Z_PARAM_VARIADIC('*', args, argc)
+	ZEND_PARSE_PARAMETERS_END();
+
+	result = php_formatted_print(format, args, argc);
+	if (result == NULL) {
 		RETURN_FALSE;
 	}
-	rlen = PHPWRITE(result->val, result->len);
-	zend_string_free(result);
+	rlen = PHPWRITE(ZSTR_VAL(result), ZSTR_LEN(result));
+	zend_string_efree(result);
 	RETURN_LONG(rlen);
 }
 /* }}} */
 
-/* {{{ proto int vprintf(string format, array args)
+/* {{{ proto int|false vprintf(string format, array args)
    Output a formatted string */
 PHP_FUNCTION(vprintf)
 {
 	zend_string *result;
 	size_t rlen;
+	zval *format, *array, *args;
+	int argc;
 
-	if ((result=php_formatted_print(ZEND_NUM_ARGS(), 1, 0))==NULL) {
+	ZEND_PARSE_PARAMETERS_START(2, 2)
+		Z_PARAM_ZVAL(format)
+		Z_PARAM_ZVAL(array)
+	ZEND_PARSE_PARAMETERS_END();
+
+	args = php_formatted_print_get_array(array, &argc);
+
+	result = php_formatted_print(format, args, argc);
+	efree(args);
+	if (result == NULL) {
 		RETURN_FALSE;
 	}
-	rlen = PHPWRITE(result->val, result->len);
-	zend_string_free(result);
+	rlen = PHPWRITE(ZSTR_VAL(result), ZSTR_LEN(result));
+	zend_string_efree(result);
 	RETURN_LONG(rlen);
 }
 /* }}} */
 
-/* {{{ proto int fprintf(resource stream, string format [, mixed arg1 [, mixed ...]])
+/* {{{ proto int|false fprintf(resource stream, string format [, mixed arg1 [, mixed ...]])
    Output a formatted string into a stream */
 PHP_FUNCTION(fprintf)
 {
 	php_stream *stream;
-	zval *arg1;
+	zval *arg1, *format, *args;
+	int argc;
 	zend_string *result;
 
 	if (ZEND_NUM_ARGS() < 2) {
 		WRONG_PARAM_COUNT;
 	}
 
-	if (zend_parse_parameters(1, "r", &arg1) == FAILURE) {
-		RETURN_FALSE;
-	}
+	ZEND_PARSE_PARAMETERS_START(2, -1)
+		Z_PARAM_RESOURCE(arg1)
+		Z_PARAM_ZVAL(format)
+		Z_PARAM_VARIADIC('*', args, argc)
+	ZEND_PARSE_PARAMETERS_END();
 
 	php_stream_from_zval(stream, arg1);
 
-	if ((result=php_formatted_print(ZEND_NUM_ARGS(), 0, 1))==NULL) {
+	result = php_formatted_print(format, args, argc);
+	if (result == NULL) {
 		RETURN_FALSE;
 	}
 
-	php_stream_write(stream, result->val, result->len);
+	php_stream_write(stream, ZSTR_VAL(result), ZSTR_LEN(result));
 
-	RETVAL_LONG(result->len);
-	zend_string_free(result);
+	RETVAL_LONG(ZSTR_LEN(result));
+	zend_string_efree(result);
 }
 /* }}} */
 
-/* {{{ proto int vfprintf(resource stream, string format, array args)
+/* {{{ proto int|false vfprintf(resource stream, string format, array args)
    Output a formatted string into a stream */
 PHP_FUNCTION(vfprintf)
 {
 	php_stream *stream;
-	zval *arg1;
+	zval *arg1, *format, *array, *args;
+	int argc;
 	zend_string *result;
 
 	if (ZEND_NUM_ARGS() != 3) {
 		WRONG_PARAM_COUNT;
 	}
 
-	if (zend_parse_parameters(1, "r", &arg1) == FAILURE) {
-		RETURN_FALSE;
-	}
+	ZEND_PARSE_PARAMETERS_START(3, 3)
+		Z_PARAM_RESOURCE(arg1)
+		Z_PARAM_ZVAL(format)
+		Z_PARAM_ZVAL(array)
+	ZEND_PARSE_PARAMETERS_END();
 
 	php_stream_from_zval(stream, arg1);
 
-	if ((result=php_formatted_print(ZEND_NUM_ARGS(), 1, 1))==NULL) {
+	args = php_formatted_print_get_array(array, &argc);
+
+	result = php_formatted_print(format, args, argc);
+	efree(args);
+	if (result == NULL) {
 		RETURN_FALSE;
 	}
 
-	php_stream_write(stream, result->val, result->len);
+	php_stream_write(stream, ZSTR_VAL(result), ZSTR_LEN(result));
 
-	RETVAL_LONG(result->len);
-	zend_string_free(result);
+	RETVAL_LONG(ZSTR_LEN(result));
+	zend_string_efree(result);
 }
 /* }}} */
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: sw=4 ts=4 fdm=marker
- * vim<600: sw=4 ts=4
- */

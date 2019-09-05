@@ -2,7 +2,7 @@
   +----------------------------------------------------------------------+
   | PHP Version 7                                                        |
   +----------------------------------------------------------------------+
-  | Copyright (c) 1997-2015 The PHP Group                                |
+  | Copyright (c) The PHP Group                                          |
   +----------------------------------------------------------------------+
   | This source file is subject to version 3.01 of the PHP license,      |
   | that is bundled with this package in the file LICENSE, and is        |
@@ -59,6 +59,12 @@ typedef void (*info_func_t)(char*);
 
 #ifndef min
 #define min(a,b) ((a)<(b)?(a):(b))
+#endif
+
+#if defined(_LP64) || defined(__LP64__) || defined(__arch64__) || defined(_WIN64)
+# define PDO_FIREBIRD_HANDLE_INITIALIZER 0U
+#else
+# define PDO_FIREBIRD_HANDLE_INITIALIZER NULL
 #endif
 
 typedef struct {
@@ -124,9 +130,9 @@ typedef struct {
 
 } pdo_firebird_stmt;
 
-extern pdo_driver_t pdo_firebird_driver;
+extern const pdo_driver_t pdo_firebird_driver;
 
-extern struct pdo_stmt_methods firebird_stmt_methods;
+extern const struct pdo_stmt_methods firebird_stmt_methods;
 
 void _firebird_error(pdo_dbh_t *dbh, pdo_stmt_t *stmt, char const *file, zend_long line);
 
@@ -137,12 +143,3 @@ enum {
 };
 
 #endif	/* PHP_PDO_FIREBIRD_INT_H */
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: noet sw=4 ts=4 fdm=marker
- * vim<600: noet sw=4 ts=4
- */

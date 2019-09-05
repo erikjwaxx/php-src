@@ -12,15 +12,7 @@ require "connect.inc";
 
 $link = ldap_connect_and_bind($host, $port, $user, $passwd, $protocol_version);
 
-// Too few parameters
-var_dump(ldap_add());
-var_dump(ldap_add($link));
-var_dump(ldap_add($link, "dc=my-domain,dc=com"));
-
-// Too many parameters
-var_dump(ldap_add($link, "dc=my-domain,dc=com", array(), "Additional data"));
-
-var_dump(ldap_add($link, "dc=my-domain,dc=com", array()));
+var_dump(ldap_add($link, "$base", array()));
 
 // Invalid DN
 var_dump(
@@ -34,14 +26,14 @@ var_dump(
 // Duplicate entry
 for ($i = 0; $i < 2; $i++)
 	var_dump(
-		ldap_add($link, "dc=my-domain,dc=com", array(
-			"objectClass"	=> array(
-				"top",
-				"dcObject",
-				"organization"),
-			"dc"			=> "my-domain",
-			"o"				=> "my-domain",
-		))
+    ldap_add($link, "dc=my-domain,$base", array(
+      "objectClass"	=> array(
+        "top",
+        "dcObject",
+        "organization"),
+      "dc"			=> "my-domain",
+      "o"				=> "my-domain",
+    ))
 	);
 var_dump(ldap_error($link), ldap_errno($link));
 
@@ -64,7 +56,7 @@ var_dump(
 
 // Invalid attribute
 var_dump(
-	ldap_add($link, "dc=my-domain,dc=com", array(
+	ldap_add($link, "$base", array(
 		"objectClass"	=> array(
 			"top",
 			"dcObject",
@@ -78,7 +70,7 @@ var_dump(
 );
 
 var_dump(
-	ldap_add($link, "dc=my-domain,dc=com", array(array( "Oops"
+	ldap_add($link, "$base", array(array( "Oops"
 	)))
 	/* Is this correct behaviour to still have "Undefined attribute type" as error/errno?
 	,
@@ -94,21 +86,9 @@ require "connect.inc";
 
 $link = ldap_connect_and_bind($host, $port, $user, $passwd, $protocol_version);
 
-ldap_delete($link, "dc=my-domain,dc=com");
+ldap_delete($link, "dc=my-domain,$base");
 ?>
 --EXPECTF--
-Warning: ldap_add() expects exactly 3 parameters, 0 given in %s on line %d
-NULL
-
-Warning: ldap_add() expects exactly 3 parameters, 1 given in %s on line %d
-NULL
-
-Warning: ldap_add() expects exactly 3 parameters, 2 given in %s on line %d
-NULL
-
-Warning: ldap_add() expects exactly 3 parameters, 4 given in %s on line %d
-NULL
-
 Warning: ldap_add(): Add: Protocol error in %s on line %d
 bool(false)
 

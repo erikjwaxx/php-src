@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | PHP Version 7                                                        |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1997-2015 The PHP Group                                |
+   | Copyright (c) The PHP Group                                          |
    +----------------------------------------------------------------------+
    | This source file is subject to version 3.01 of the PHP license,      |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -19,12 +19,13 @@
 #ifndef PHP_GMP_H
 #define PHP_GMP_H
 
-#if HAVE_GMP
-
 #include <gmp.h>
 
 extern zend_module_entry gmp_module_entry;
 #define phpext_gmp_ptr &gmp_module_entry
+
+#include "php_version.h"
+#define PHP_GMP_VERSION PHP_VERSION
 
 ZEND_MODULE_STARTUP_D(gmp);
 ZEND_MODULE_DEACTIVATE_D(gmp);
@@ -53,12 +54,14 @@ ZEND_FUNCTION(gmp_rootrem);
 ZEND_FUNCTION(gmp_pow);
 ZEND_FUNCTION(gmp_powm);
 ZEND_FUNCTION(gmp_perfect_square);
+ZEND_FUNCTION(gmp_perfect_power);
 ZEND_FUNCTION(gmp_prob_prime);
 ZEND_FUNCTION(gmp_gcd);
 ZEND_FUNCTION(gmp_gcdext);
 ZEND_FUNCTION(gmp_invert);
 ZEND_FUNCTION(gmp_jacobi);
 ZEND_FUNCTION(gmp_legendre);
+ZEND_FUNCTION(gmp_kronecker);
 ZEND_FUNCTION(gmp_cmp);
 ZEND_FUNCTION(gmp_sign);
 ZEND_FUNCTION(gmp_and);
@@ -77,42 +80,18 @@ ZEND_FUNCTION(gmp_testbit);
 ZEND_FUNCTION(gmp_popcount);
 ZEND_FUNCTION(gmp_hamdist);
 ZEND_FUNCTION(gmp_nextprime);
-
-/* GMP and MPIR use different datatypes on different platforms */
-#ifdef PHP_WIN32
-typedef zend_long gmp_long;
-typedef zend_ulong gmp_ulong;
-#else
-typedef long gmp_long;
-typedef unsigned long gmp_ulong;
-#endif
+ZEND_FUNCTION(gmp_binomial);
+ZEND_FUNCTION(gmp_lcm);
 
 ZEND_BEGIN_MODULE_GLOBALS(gmp)
 	zend_bool rand_initialized;
 	gmp_randstate_t rand_state;
 ZEND_END_MODULE_GLOBALS(gmp)
 
-#ifdef ZTS
-#define GMPG(v) ZEND_TSRMG(gmp_globals_id, zend_gmp_globals *, v)
-#ifdef COMPILE_DL_GMP
-ZEND_TSRMLS_CACHE_EXTERN();
-#endif
-#else
-#define GMPG(v) (gmp_globals.v)
-#endif
+#define GMPG(v) ZEND_MODULE_GLOBALS_ACCESSOR(gmp, v)
 
-#else
-
-#define phpext_gmp_ptr NULL
-
+#if defined(ZTS) && defined(COMPILE_DL_GMP)
+ZEND_TSRMLS_CACHE_EXTERN()
 #endif
 
 #endif	/* PHP_GMP_H */
-
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- */

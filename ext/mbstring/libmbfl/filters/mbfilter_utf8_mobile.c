@@ -52,7 +52,9 @@ const mbfl_encoding mbfl_encoding_utf8_docomo = {
 	"UTF-8",
 	(const char *(*)[])&mbfl_encoding_utf8_docomo_aliases,
 	mblen_table_utf8,
-	MBFL_ENCTYPE_MBCS
+	MBFL_ENCTYPE_MBCS,
+	&vtbl_utf8_docomo_wchar,
+	&vtbl_wchar_utf8_docomo
 };
 
 const mbfl_encoding mbfl_encoding_utf8_kddi_a = {
@@ -61,7 +63,9 @@ const mbfl_encoding mbfl_encoding_utf8_kddi_a = {
 	"UTF-8",
 	(const char *(*)[])&mbfl_encoding_utf8_kddi_a_aliases,
 	mblen_table_utf8,
-	MBFL_ENCTYPE_MBCS
+	MBFL_ENCTYPE_MBCS,
+	&vtbl_utf8_kddi_a_wchar,
+	&vtbl_wchar_utf8_kddi_a
 };
 
 const mbfl_encoding mbfl_encoding_utf8_kddi_b = {
@@ -70,7 +74,9 @@ const mbfl_encoding mbfl_encoding_utf8_kddi_b = {
 	"UTF-8",
 	(const char *(*)[])&mbfl_encoding_utf8_kddi_b_aliases,
 	mblen_table_utf8,
-	MBFL_ENCTYPE_MBCS
+	MBFL_ENCTYPE_MBCS,
+	&vtbl_utf8_kddi_b_wchar,
+	&vtbl_wchar_utf8_kddi_b
 };
 
 const mbfl_encoding mbfl_encoding_utf8_sb = {
@@ -79,7 +85,9 @@ const mbfl_encoding mbfl_encoding_utf8_sb = {
 	"UTF-8",
 	(const char *(*)[])&mbfl_encoding_utf8_sb_aliases,
 	mblen_table_utf8,
-	MBFL_ENCTYPE_MBCS
+	MBFL_ENCTYPE_MBCS,
+	&vtbl_utf8_sb_wchar,
+	&vtbl_wchar_utf8_sb
 };
 
 const struct mbfl_identify_vtbl vtbl_identify_utf8_docomo = {
@@ -183,14 +191,14 @@ const struct mbfl_convert_vtbl vtbl_wchar_utf8_sb = {
 };
 
 #define CK(statement)	do { if ((statement) < 0) return (-1); } while (0)
+int mbfl_filt_put_invalid_char(int c, mbfl_convert_filter *filter);
 
 /*
  * UTF-8 => wchar
  */
 int mbfl_filt_conv_utf8_mobile_wchar(int c, mbfl_convert_filter *filter)
 {
-	int s, w = 0, flag = 0;
-	int s1 = 0, c1 = 0, snd = 0;
+	int s, s1 = 0, c1 = 0, snd = 0;
 
 retry:
 	switch (filter->status & 0xff) {
@@ -207,7 +215,7 @@ retry:
 			filter->status = 0x30;
 			filter->cache = c & 0x7;
 		} else {
-			mbfl_filt_put_invalid_char(c, filter);
+			CK(mbfl_filt_put_invalid_char(c, filter));
 		}
 		break;
 	case 0x10: /* 2byte code 2nd char: 0x80-0xbf */
@@ -237,7 +245,7 @@ retry:
 			}
 			CK((*filter->output_function)(s, filter->data));
 		} else {
-			mbfl_filt_put_invalid_char(filter->cache, filter);
+			CK(mbfl_filt_put_invalid_char(filter->cache, filter));
 			goto retry;
 		}
 		break;
@@ -252,7 +260,7 @@ retry:
 			filter->cache = s;
 			filter->status++;
 		} else {
-			mbfl_filt_put_invalid_char(filter->cache, filter);
+			CK(mbfl_filt_put_invalid_char(filter->cache, filter));
 			goto retry;
 		}
 		break;
@@ -267,7 +275,7 @@ retry:
 			filter->cache = s;
 			filter->status++;
 		} else {
-			mbfl_filt_put_invalid_char(filter->cache, filter);
+			CK(mbfl_filt_put_invalid_char(filter->cache, filter));
 			goto retry;
 		}
 		break;
@@ -276,7 +284,7 @@ retry:
 			filter->cache = (filter->cache<<6) | (c & 0x3f);
 			filter->status++;
 		} else {
-			mbfl_filt_put_invalid_char(filter->cache, filter);
+			CK(mbfl_filt_put_invalid_char(filter->cache, filter));
 			goto retry;
 		}
 		break;
@@ -331,11 +339,8 @@ int mbfl_filt_conv_wchar_utf8_mobile(int c, mbfl_convert_filter *filter)
 			CK((*filter->output_function)((c & 0x3f) | 0x80, filter->data));
 		}
 	} else {
-		if (filter->illegal_mode != MBFL_OUTPUTFILTER_ILLEGAL_MODE_NONE) {
-			CK(mbfl_filt_conv_illegal_output(c, filter));
-		}
+		CK(mbfl_filt_conv_illegal_output(c, filter));
 	}
 
 	return c;
 }
-

@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | PHP Version 7                                                        |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1997-2015 The PHP Group                                |
+   | Copyright (c) The PHP Group                                          |
    +----------------------------------------------------------------------+
    | This source file is subject to version 3.01 of the PHP license,      |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -15,8 +15,6 @@
    | Authors: Marcus Boerger <helly@php.net>                              |
    +----------------------------------------------------------------------+
  */
-
-/* $Id$ */
 
 #ifndef SPL_DIRECTORY_H
 #define SPL_DIRECTORY_H
@@ -61,7 +59,7 @@ typedef struct {
 
 struct _spl_filesystem_object {
 	void               *oth;
-	spl_other_handler  *oth_handler;
+	const spl_other_handler  *oth_handler;
 	char               *_path;
 	size_t             _path_len;
 	char               *orig_path;
@@ -98,10 +96,9 @@ struct _spl_filesystem_object {
 			zend_function      *func_getCurr;
 			char               delimiter;
 			char               enclosure;
-			char               escape;
+			int                escape;
 		} file;
 	} u;
-	spl_filesystem_iterator    *it;
 	zend_object        std;
 };
 
@@ -114,10 +111,12 @@ static inline spl_filesystem_object *spl_filesystem_from_obj(zend_object *obj) /
 
 static inline spl_filesystem_iterator* spl_filesystem_object_to_iterator(spl_filesystem_object *obj)
 {
-	obj->it = ecalloc(1, sizeof(spl_filesystem_iterator));
-	obj->it->object = (void *)obj;
-	zend_iterator_init(&obj->it->intern);
-	return obj->it;
+	spl_filesystem_iterator    *it;
+
+	it = ecalloc(1, sizeof(spl_filesystem_iterator));
+	it->object = (void *)obj;
+	zend_iterator_init(&it->intern);
+	return it;
 }
 
 static inline spl_filesystem_object* spl_filesystem_iterator_to_object(spl_filesystem_iterator *it)
@@ -148,12 +147,3 @@ static inline spl_filesystem_object* spl_filesystem_iterator_to_object(spl_files
 #define SPL_FILE_DIR_OTHERS_MASK           0x00003000 /* mask used for get/setFlags */
 
 #endif /* SPL_DIRECTORY_H */
-
-/*
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 4
- * End:
- * vim600: fdm=marker
- * vim: noet sw=4 ts=4
- */

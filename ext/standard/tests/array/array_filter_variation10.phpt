@@ -3,7 +3,7 @@ Test array_filter() function : usage variations - using the array keys inside 'c
 --FILE--
 <?php
 /* Prototype  : array array_filter(array $input [, callback $callback [, bool $use_type = ARRAY_FILTER_USE_VALUE]])
- * Description: Filters elements from the array via the callback. 
+ * Description: Filters elements from the array via the callback.
  * Source code: ext/standard/array.c
 */
 
@@ -34,7 +34,11 @@ var_dump( array_filter($input, 'dump2', true) );
 
 echo "*** Testing array_filter() : usage variations - 'callback' expecting second argument ***\n";
 
-var_dump( array_filter($small, 'dump', false) );
+try {
+	var_dump( array_filter($small, 'dump', false) );
+} catch (Throwable $e) {
+	echo "Exception: " . $e->getMessage() . "\n";
+}
 
 echo "*** Testing array_filter() with various use types ***\n";
 
@@ -44,7 +48,11 @@ var_dump(array_filter($mixed, 'is_numeric', ARRAY_FILTER_USE_KEY));
 
 var_dump(array_filter($mixed, 'is_numeric', 0));
 
-var_dump(array_filter($mixed, 'is_numeric', ARRAY_FILTER_USE_BOTH));
+try {
+    var_dump(array_filter($mixed, 'is_numeric', ARRAY_FILTER_USE_BOTH));
+} catch (TypeError $e) {
+    echo $e->getMessage(), "\n";
+}
 
 echo "Done"
 ?>
@@ -70,13 +78,7 @@ array(3) {
   NULL
 }
 *** Testing array_filter() : usage variations - 'callback' expecting second argument ***
-
-Warning: Missing argument 2 for dump() in %s on line %d
-
-Notice: Undefined variable: key in %s on line %d
- = 123
-array(0) {
-}
+Exception: Too few arguments to function dump(), 1 passed and exactly 2 expected
 *** Testing array_filter() with various use types ***
 array(2) {
   [1]=>
@@ -90,14 +92,5 @@ array(2) {
   ["b"]=>
   int(2)
 }
-
-Warning: is_numeric() expects exactly 1 parameter, 2 given in %s on line 44
-
-Warning: is_numeric() expects exactly 1 parameter, 2 given in %s on line 44
-
-Warning: is_numeric() expects exactly 1 parameter, 2 given in %s on line 44
-
-Warning: is_numeric() expects exactly 1 parameter, 2 given in %s on line 44
-array(0) {
-}
+is_numeric() expects exactly 1 parameter, 2 given
 Done

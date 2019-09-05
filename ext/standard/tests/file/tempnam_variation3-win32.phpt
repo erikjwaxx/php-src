@@ -14,7 +14,7 @@ if(substr(PHP_OS, 0, 3) != "WIN")
 /* Passing invalid/non-existing args for $prefix */
 
 echo "*** Testing tempnam() with obscure prefixes ***\n";
-$file_path = dirname(__FILE__)."/tempnamVar3";
+$file_path = __DIR__."/tempnamVar3";
 if (!mkdir($file_path)) {
 	echo "Failed, cannot create temp dir $filepath\n";
 	exit(1);
@@ -22,9 +22,9 @@ if (!mkdir($file_path)) {
 
 $file_path = realpath($file_path);
 
-/* An array of prefixes */ 
+/* An array of prefixes */
 $names_arr = array(
-	/* Valid args (casting)*/ 
+	/* Valid args (casting)*/
 	-1,
 	TRUE,
 	FALSE,
@@ -32,17 +32,17 @@ $names_arr = array(
 	"",
 	" ",
 	"\0",
-	/* Invalid args */ 
+	/* Invalid args */
 	array(),
 
-	/* Valid args*/ 
+	/* Valid args*/
 	/* prefix with path separator of a non existing directory*/
-	"/no/such/file/dir", 
+	"/no/such/file/dir",
 	"php/php"
 );
 
 $res_arr = array(
-	/* Invalid args */ 
+	/* Invalid args */
 	true,
 	true,
 	true,
@@ -53,13 +53,18 @@ $res_arr = array(
 	false,
 
 	/* prefix with path separator of a non existing directory*/
-	true, 
+	true,
 	true
 );
 
 for( $i=0; $i<count($names_arr); $i++ ) {
 	echo "-- Iteration $i --\n";
-	$file_name = tempnam($file_path, $names_arr[$i]);
+	try {
+        $file_name = tempnam($file_path, $names_arr[$i]);
+    } catch (TypeError $e) {
+        echo $e->getMessage(), "\n";
+        continue;
+    }
 
 	/* creating the files in existing dir */
 	if (file_exists($file_name) && !$res_arr[$i]) {
@@ -72,7 +77,7 @@ for( $i=0; $i<count($names_arr); $i++ ) {
 		} else {
 			echo "Failed, not created in the correct directory " . realpath($file_dir) . ' vs ' . $file_path ."\n";
 		}
-		
+
 		if (!is_writable($file_name)) {
 			printf("%o\n", fileperms($file_name) );
 
@@ -99,14 +104,14 @@ OK
 -- Iteration 4 --
 OK
 -- Iteration 5 --
+
+Notice: tempnam(): file created in the system's temporary directory in %stempnam_variation3-win32.php on line %d
 Failed, not created in the correct directory %s vs %s
 0
 -- Iteration 6 --
-OK
+tempnam() expects parameter 2 to be a valid path, string given
 -- Iteration 7 --
-
-Warning: tempnam() expects parameter 2 to be string, array given in %s\ext\standard\tests\file\tempnam_variation3-win32.php on line %d
-OK
+tempnam() expects parameter 2 to be a valid path, array given
 -- Iteration 8 --
 OK
 -- Iteration 9 --

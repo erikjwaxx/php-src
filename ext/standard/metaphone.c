@@ -2,7 +2,7 @@
    +----------------------------------------------------------------------+
    | PHP Version 7                                                        |
    +----------------------------------------------------------------------+
-   | Copyright (c) 1997-2015 The PHP Group                                |
+   | Copyright (c) The PHP Group                                          |
    +----------------------------------------------------------------------+
    | This source file is subject to version 3.01 of the PHP license,      |
    | that is bundled with this package in the file LICENSE, and is        |
@@ -16,8 +16,6 @@
    +----------------------------------------------------------------------+
 */
 
-/* $Id$ */
-
 /*
 	Based on CPANs "Text-Metaphone-1.96" by Michael G Schwern <schwern@pobox.com>
 */
@@ -27,7 +25,7 @@
 
 static int metaphone(unsigned char *word, size_t word_len, zend_long max_phonemes, zend_string **phoned_word, int traditional);
 
-/* {{{ proto string metaphone(string text[, int phones])
+/* {{{ proto string|false metaphone(string text[, int phones])
    Break english phrases down into their phonemes */
 PHP_FUNCTION(metaphone)
 {
@@ -35,11 +33,13 @@ PHP_FUNCTION(metaphone)
 	zend_string *result = NULL;
 	zend_long phones = 0;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS(), "S|l", &str, &phones) == FAILURE) {
-		return;
-	}
+	ZEND_PARSE_PARAMETERS_START(1, 2)
+		Z_PARAM_STR(str)
+		Z_PARAM_OPTIONAL
+		Z_PARAM_LONG(phones)
+	ZEND_PARSE_PARAMETERS_END();
 
-	if (metaphone((unsigned char *)str->val, str->len, phones, &result, 1) == 0) {
+	if (metaphone((unsigned char *)ZSTR_VAL(str), ZSTR_LEN(str), phones, &result, 1) == 0) {
 		RETVAL_STR(result);
 	} else {
 		if (result) {
@@ -76,7 +76,7 @@ PHP_FUNCTION(metaphone)
 /* Metachar.h ... little bits about characters for metaphone */
 /*-- Character encoding array & accessing macros --*/
 /* Stolen directly out of the book... */
-char _codes[26] =
+static const char _codes[26] =
 {
 	1, 16, 4, 16, 9, 2, 4, 16, 9, 2, 0, 2, 2, 2, 1, 4, 0, 2, 4, 4, 1, 0, 0, 0, 8, 0
 /*  a  b c  d e f g  h i j k l m n o p q r s t u v w x y z */
@@ -142,20 +142,20 @@ static char Lookahead(char *word, int how_far)
  * could be one though; or more too). */
 #define Phonize(c)	{ \
 						if (p_idx >= max_buffer_len) { \
-							*phoned_word = zend_string_realloc(*phoned_word, 2 * sizeof(char) + max_buffer_len, 0); \
+							*phoned_word = zend_string_extend(*phoned_word, 2 * sizeof(char) + max_buffer_len, 0); \
 							max_buffer_len += 2; \
 						} \
-						(*phoned_word)->val[p_idx++] = c; \
-						(*phoned_word)->len = p_idx; \
+						ZSTR_VAL(*phoned_word)[p_idx++] = c; \
+						ZSTR_LEN(*phoned_word) = p_idx; \
 					}
 /* Slap a null character on the end of the phoned word */
 #define End_Phoned_Word	{ \
 							if (p_idx == max_buffer_len) { \
-								*phoned_word = zend_string_realloc(*phoned_word, 1 * sizeof(char) + max_buffer_len, 0); \
+								*phoned_word = zend_string_extend(*phoned_word, 1 * sizeof(char) + max_buffer_len, 0); \
 								max_buffer_len += 1; \
 							} \
-							(*phoned_word)->val[p_idx] = '\0'; \
-							(*phoned_word)->len = p_idx; \
+							ZSTR_VAL(*phoned_word)[p_idx] = '\0'; \
+							ZSTR_LEN(*phoned_word) = p_idx; \
 						}
 /* How long is the phoned word? */
 #define Phone_Len	(p_idx)
@@ -168,7 +168,7 @@ static char Lookahead(char *word, int how_far)
 static int metaphone(unsigned char *word, size_t word_len, zend_long max_phonemes, zend_string **phoned_word, int traditional)
 {
 	int w_idx = 0;				/* point in the phonization we're at. */
-	int p_idx = 0;				/* end of the phoned phrase */
+	size_t p_idx = 0;				/* end of the phoned phrase */
 	size_t max_buffer_len = 0;		/* maximum length of the destination buffer */
 
 /*-- Parameter checks --*/
@@ -265,7 +265,7 @@ static int metaphone(unsigned char *word, size_t word_len, zend_long max_phoneme
 
 	/* On to the metaphoning */
 	for (; Curr_Letter != '\0' &&
-		 (max_phonemes == 0 || Phone_Len < max_phonemes);
+		 (max_phonemes == 0 || Phone_Len < (size_t)max_phonemes);
 		 w_idx++) {
 		/* How many letters to skip because an eariler encoding handled
 		 * multiple letters */
@@ -470,12 +470,3 @@ static int metaphone(unsigned char *word, size_t word_len, zend_long max_phoneme
 	return 0;
 }								/* END metaphone */
 /* }}} */
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: sw=4 ts=4 fdm=marker
- * vim<600: sw=4 ts=4
- */

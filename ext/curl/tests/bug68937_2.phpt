@@ -1,14 +1,17 @@
 --TEST--
 Bug # #68937 (Segfault in curl_multi_exec)
 --SKIPIF--
-<?php 
-if (getenv("SKIP_ONLINE_TESTS")) die("skip online test");
+<?php
 include 'skipif.inc';
 ?>
 --FILE--
 <?php
+include 'server.inc';
+$host = curl_cli_server_start();
 
-$ch = curl_init('http://www.google.com/');
+$url = "{$host}/get.inc";
+
+$ch = curl_init($url);
 curl_setopt_array($ch, array(
 	CURLOPT_HEADER => false,
 	CURLOPT_RETURNTRANSFER => true,
@@ -16,9 +19,12 @@ curl_setopt_array($ch, array(
 	CURLOPT_INFILESIZE => filesize(__FILE__),
 	CURLOPT_INFILE => fopen(__FILE__, 'r'),
 	CURLOPT_HTTPHEADER => array(
+		'Expect:',
 		'Content-Length: 1',
 	),
-	CURLOPT_READFUNCTION => 'curl_read'
+	CURLOPT_READFUNCTION => 'curl_read',
+	CURLOPT_CONNECTTIMEOUT => 1,
+	CURLOPT_TIMEOUT => 1
 ));
 
 function curl_read($ch, $fp, $len) {

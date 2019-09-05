@@ -1,6 +1,5 @@
 --TEST--
 Returned string, expected array
-
 --FILE--
 <?php
 function test1() : array {
@@ -8,6 +7,9 @@ function test1() : array {
 }
 
 test1();
-
 --EXPECTF--
-Catchable fatal error: Return value of test1() must be of the type array, string returned in %s on line %d
+Fatal error: Uncaught TypeError: Return value of test1() must be of the type array, string returned in %s:%d
+Stack trace:
+#0 %s(%d): test1()
+#1 {main}
+  thrown in %s on line %d

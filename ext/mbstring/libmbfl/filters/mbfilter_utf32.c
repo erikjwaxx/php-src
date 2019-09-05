@@ -42,7 +42,9 @@ const mbfl_encoding mbfl_encoding_utf32 = {
 	"UTF-32",
 	(const char *(*)[])&mbfl_encoding_utf32_aliases,
 	NULL,
-	MBFL_ENCTYPE_WCS4BE
+	MBFL_ENCTYPE_WCS4BE,
+	&vtbl_utf32_wchar,
+	&vtbl_wchar_utf32
 };
 
 const mbfl_encoding mbfl_encoding_utf32be = {
@@ -51,7 +53,9 @@ const mbfl_encoding mbfl_encoding_utf32be = {
 	"UTF-32BE",
 	NULL,
 	NULL,
-	MBFL_ENCTYPE_WCS4BE
+	MBFL_ENCTYPE_WCS4BE,
+	&vtbl_utf32be_wchar,
+	&vtbl_wchar_utf32be
 };
 
 const mbfl_encoding mbfl_encoding_utf32le = {
@@ -60,7 +64,9 @@ const mbfl_encoding mbfl_encoding_utf32le = {
 	"UTF-32LE",
 	NULL,
 	NULL,
-	MBFL_ENCTYPE_WCS4LE
+	MBFL_ENCTYPE_WCS4LE,
+	&vtbl_utf32le_wchar,
+	&vtbl_wchar_utf32le
 };
 
 const struct mbfl_convert_vtbl vtbl_utf32_wchar = {
@@ -132,7 +138,7 @@ int mbfl_filt_conv_utf32_wchar(int c, mbfl_convert_filter *filter)
 		if (endian) {
 			n = c & 0xff;
 		} else {
-			n = (c & 0xff) << 24;
+			n = (unsigned) (c & 0xff) << 24;
 		}
 		filter->cache = n;
 		filter->status++;
@@ -227,9 +233,7 @@ int mbfl_filt_conv_wchar_utf32be(int c, mbfl_convert_filter *filter)
 		CK((*filter->output_function)((c >> 8) & 0xff, filter->data));
 		CK((*filter->output_function)(c & 0xff, filter->data));
 	} else {
-		if (filter->illegal_mode != MBFL_OUTPUTFILTER_ILLEGAL_MODE_NONE) {
-			CK(mbfl_filt_conv_illegal_output(c, filter));
-		}
+		CK(mbfl_filt_conv_illegal_output(c, filter));
 	}
 
 	return c;
@@ -278,9 +282,7 @@ int mbfl_filt_conv_wchar_utf32le(int c, mbfl_convert_filter *filter)
 		CK((*filter->output_function)((c >> 16) & 0xff, filter->data));
 		CK((*filter->output_function)((c >> 24) & 0xff, filter->data));
 	} else {
-		if (filter->illegal_mode != MBFL_OUTPUTFILTER_ILLEGAL_MODE_NONE) {
-			CK(mbfl_filt_conv_illegal_output(c, filter));
-		}
+		CK(mbfl_filt_conv_illegal_output(c, filter));
 	}
 
 	return c;
